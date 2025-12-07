@@ -536,52 +536,95 @@ requestLocationAndLoad();
 // ==========================================================
 // CITY SEARCH – NUR DE + TR & AUTO-SELECT BEIM FOKUS
 // ==========================================================
+// ==========================================================
+// CITY SEARCH – SCHNELL, LOKAL & SCHÖN
+// ==========================================================
 const cityInput = document.getElementById("city-search");
 const cityResults = document.getElementById("city-results");
 
-if (cityInput) {
+// Lokale Datenbank — extrem schnell
+const LOCAL_CITIES = [
+  // Deutschland
+  { name: "Berlin", country: "DE" },
+  { name: "Bremen", country: "DE" },
+  { name: "Bonn", country: "DE" },
+  { name: "Hamburg", country: "DE" },
+  { name: "Hannover", country: "DE" },
+  { name: "München", country: "DE" },
+  { name: "Frankfurt", country: "DE" },
+  { name: "Düsseldorf", country: "DE" },
 
-  // ⭐ Beim Klick ins Feld → alles markieren
-  cityInput.addEventListener("focus", () => {
-    cityInput.select();
-  });
+  // Türkei
+  { name: "Istanbul", country: "TR" },
+  { name: "Ankara", country: "TR" },
+  { name: "Izmir", country: "TR" },
+  { name: "Bursa", country: "TR" },
+  { name: "Antalya", country: "TR" },
+  { name: "Konya", country: "TR" },
+  { name: "Gaziantep", country: "TR" },
+  { name: "Trabzon", country: "TR" },
+  { name: "Bodrum", country: "TR" },
+  { name: "Balıkesir", country: "TR" }
+];
 
-  cityInput.addEventListener("input", async () => {
-    const query = cityInput.value.trim();
+const FLAGS = {
+  "DE": "🇩🇪",
+  "TR": "🇹🇷"
+};
 
-    if (query.length < 2) {
+// Beim Klick → Text markieren
+cityInput.addEventListener("focus", () => cityInput.select());
+
+cityInput.addEventListener("input", async () => {
+  const query = cityInput.value.trim().toLowerCase();
+
+  if (query.length < 1) {
+    cityResults.style.display = "none";
+    return;
+  }
+
+  // Lokale Filterung
+  const matches = LOCAL_CITIES.filter(c =>
+    c.name.toLowerCase().startsWith(query)
+  );
+
+  cityResults.innerHTML = "";
+  cityResults.style.display = matches.length ? "block" : "none";
+
+  matches.forEach(city => {
+    const item = document.createElement("div");
+    item.className = "city-result-item neon-option";
+
+    // ersten Buchstaben highlighten
+    const highlight =
+      `<span class="hl">${city.name.charAt(0)}</span>${city.name.slice(1)}`;
+
+    item.innerHTML = `
+      <div class="city-entry">
+        <span class="flag">${FLAGS[city.country]}</span>
+        <span class="city-name">${highlight}</span>
+      </div>
+    `;
+
+    // Bei Klick Koordinaten laden
+    item.addEventListener("click", async () => {
+      cityInput.value = city.name;
       cityResults.style.display = "none";
-      return;
-    }
 
-    // Nur Deutschland und Türkei
-    const COUNTRIES = ["DE", "TR"];
-    let allResults = [];
+      // Geo API abrufen (Koordinaten)
+      const geo = await fetch(
+        `https://api.openweathermap.org/geo/1.0/direct?q=${city.name},${city.country}&limit=1&appid=${API_KEY}`
+      );
+      const res = await geo.json();
+      if (!res[0]) return;
 
-    for (const country of COUNTRIES) {
-      const url = `https://api.openweathermap.org/geo/1.0/direct?q=${query},${country}&limit=5&appid=${API_KEY}`;
-      const res = await fetch(url);
-      const cities = await res.json();
-      allResults = allResults.concat(cities);
-    }
-
-    cityResults.innerHTML = "";
-    cityResults.style.display = allResults.length ? "block" : "none";
-
-    allResults.forEach(c => {
-      const item = document.createElement("div");
-      item.className = "city-result-item";
-      item.textContent = `${c.name}, ${c.country}`;
-
-      item.addEventListener("click", () => {
-        cityInput.value = `${c.name}, ${c.country}`;
-        cityResults.style.display = "none";
-
-        loadWeather(null, c.lat, c.lon);
-      });
-
-      cityResults.appendChild(item);
+      loadWeather(null, res[0].lat, res[0].lon);
     });
+
+    cityResults.appendChild(item);
   });
-}
+});
+
+
+
 
