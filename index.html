@@ -4,25 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Istanbul Wetter – Neon Future</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
 
-  <!-- Manifest für iPhone WebApp -->
-  <link rel="manifest" href="manifest.json">
-
-  <!-- iOS Vollbild -->
+  <!-- iOS / PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Istanbul Wetter – Neon Future">
   <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Manifest für PWA -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- GSAP Animation Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
 
   <!-- CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Hintergrundvideo -->
   <video id="bg-video" class="bg-video" autoplay muted loop playsinline></video>
 
   <!-- Futuristischer Gradient-Background -->
-  
   <div class="bg-orb orb-1"></div>
   <div class="bg-orb orb-2"></div>
   <div class="bg-noise"></div>
@@ -37,6 +40,22 @@
       </div>
       <div class="hero-sub">
         <div class="hero-meta" id="hero-meta">---</div>
+      </div>
+    </section>
+
+    <!-- STANDORT WÄHLEN (Suche mit Dropdown) -->
+    <section class="section">
+      <h2 class="section-title">Standort wählen</h2>
+
+      <div class="city-selector">
+        <input
+          id="city-search"
+          class="city-search-input"
+          type="text"
+          placeholder="Stadt suchen..."
+          autocomplete="off"
+        />
+        <div id="city-results" class="city-results"></div>
       </div>
     </section>
 
@@ -65,57 +84,53 @@
       <div id="advanced-grid" class="advanced-grid">
         <!-- Advanced Cards via JS -->
       </div>
+
       <!-- COSMIC & DYNAMICS -->
-<section class="section">
-  <h2 class="section-title">Cosmic & Dynamics</h2>
-  <div class="metrics-grid">
-    <div id="moon-card" class="card moon-card">
-      <!-- wird per JS gefüllt -->
-    </div>
-    <div id="wind-card" class="card wind-card">
-      <!-- wird per JS gefüllt -->
-    </div>
-  </div>
-</section>
+      <section class="section">
+        <h2 class="section-title">Cosmic & Dynamics</h2>
+        <div class="metrics-grid">
+          <div id="moon-card" class="card moon-card">
+            <!-- wird per JS gefüllt -->
+          </div>
+          <div id="wind-card" class="card wind-card">
+            <!-- wird per JS gefüllt -->
+          </div>
+        </div>
+      </section>
 
-<!-- RAIN & COMFORT -->
-<section class="section">
-  <h2 class="section-title">Rain & Comfort</h2>
+      <!-- RAIN & COMFORT -->
+      <section class="section">
+        <h2 class="section-title">Rain & Comfort</h2>
 
-  <div id="rain-card" class="card rain-card">
-    <div class="card-title">Regenwahrscheinlichkeit</div>
-    <canvas id="rain-canvas"></canvas>
-    <div class="card-extra" id="rain-caption"></div>
-  </div>
+        <div id="rain-card" class="card rain-card">
+          <div class="card-title">Regenwahrscheinlichkeit</div>
+          <canvas id="rain-canvas"></canvas>
+          <div class="card-extra" id="rain-caption"></div>
+        </div>
 
-  <div id="heat-card" class="card heat-card">
-    <div class="card-title">Komfort / Heat Stress</div>
-    <div class="heat-scale">
-      <div class="heat-labels">
-        <span>Frost</span>
-        <span>Kalt</span>
-        <span>Cool</span>
-        <span>Comfort</span>
-        <span>Warm</span>
-        <span>Hot</span>
-        <span>Danger</span>
-      </div>
-      <div class="heat-track">
-        <div class="heat-gradient"></div>
-        <div class="heat-marker" id="heat-marker"></div>
-      </div>
-    </div>
-    <div class="card-extra" id="heat-caption"></div>
-  </div>
-</section>
-
+        <div id="heat-card" class="card heat-card">
+          <div class="card-title">Komfort / Heat Stress</div>
+          <div class="heat-scale">
+            <div class="heat-labels">
+              <span>Frost</span>
+              <span>Kalt</span>
+              <span>Cool</span>
+              <span>Comfort</span>
+              <span>Warm</span>
+              <span>Hot</span>
+              <span>Danger</span>
+            </div>
+            <div class="heat-track">
+              <div class="heat-gradient"></div>
+              <div class="heat-marker" id="heat-marker"></div>
+            </div>
+          </div>
+          <div class="card-extra" id="heat-caption"></div>
+        </div>
+      </section>
     </section>
     
   </main>
-
-  <!-- GSAP für moderne Motion-Animationen -->
-  
-
 
   <!-- App Script -->
   <script src="app.js"></script>
@@ -128,5 +143,4 @@
   </script>
 </body>
 </html>
-
 
