@@ -486,3 +486,46 @@ body {
 .city-result-item:hover {
   background: rgba(255,255,255,0.08);
 }
+.city-results {
+  position: absolute;
+  width: 100%;
+  background: rgba(10, 12, 30, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  margin-top: 6px;
+  padding: 6px 0;
+  z-index: 5000;
+  display: none;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+  animation: fadeIn 0.25s ease;
+}
+
+.city-result-item {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.city-result-item:hover {
+  background: rgba(0,245,255,0.15);
+  transform: translateX(6px);
+}
+
+.flag {
+  font-size: 1.1rem;
+}
+
+.hl {
+  color: #00f5ff;
+  font-weight: 600;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
