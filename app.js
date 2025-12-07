@@ -1,6 +1,8 @@
+// ==========================================================
 // API Setup
+// ==========================================================
 const API_KEY = "83bcc8dbea48e891fc4cb6cd868ad732";
-const CITY = "Istanbul";
+const DEFAULT_CITY = "Istanbul";
 const UNITS = "metric";
 const LANG = "de";
 
@@ -13,13 +15,50 @@ const forecastTrackEl = document.getElementById("forecast-track");
 const advancedGridEl = document.getElementById("advanced-grid");
 
 
-// ========================================
-// LOAD WEATHER
-// ========================================
-async function loadWeather() {
+// ==========================================================
+// GEODATEN LADEN
+// ==========================================================
+async function requestLocationAndLoad() {
+  if (!navigator.geolocation) {
+    console.warn("Geolocation nicht verfügbar. Lade Standardstadt.");
+    loadWeather(DEFAULT_CITY);
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      console.log("GPS Standort:", lat, lon);
+
+      await loadWeather(null, lat, lon);
+    },
+    (err) => {
+      console.warn("Standort abgelehnt → Standardstadt wird geladen.");
+      loadWeather(DEFAULT_CITY);
+    }
+  );
+}
+
+
+// ==========================================================
+// HAUPTFUNKTION
+// ==========================================================
+async function loadWeather(city = null, lat = null, lon = null) {
   try {
-    const currentUrl = `https://api.openweathermap.org/data/2.5/weather?q=${CITY}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
-    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${CITY}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
+    let currentUrl, forecastUrl;
+
+    if (lat && lon) {
+      // Standort-Modus
+      currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
+      forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
+    } else {
+      // Standardstadt
+      city = city || DEFAULT_CITY;
+      currentUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
+      forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
+    }
 
     const [currentRes, forecastRes] = await Promise.all([
       fetch(currentUrl),
@@ -29,31 +68,32 @@ async function loadWeather() {
     const current = await currentRes.json();
     const forecast = await forecastRes.json();
 
+    // Stadtname aktualisieren
+    document.querySelector(".hero-city").textContent = current.name;
+
     renderHero(current);
     renderMetrics(current);
     renderForecast(forecast);
     renderAdvanced(current);
-
     renderMoon(current);
     renderWindCompass(current);
     renderRainWaveform(forecast);
     renderHeatStress(current);
     updateBackgroundVideo(current);
 
-
     runIntroAnimations();
     enableMaximumParallax();
 
   } catch (err) {
     console.error(err);
-    heroCondEl.textContent = "Fehler beim Laden des Wetters.";
+    heroCondEl.textContent = "Fehler beim Laden.";
   }
 }
 
 
-// ========================================
+// ==========================================================
 // HERO
-// ========================================
+// ==========================================================
 function renderHero(data) {
   const temp = Math.round(data.main.temp);
   const feels = Math.round(data.main.feels_like);
@@ -66,17 +106,17 @@ function renderHero(data) {
   heroMetaEl.textContent = `Gefühlt ${feels}° • Wind ${wind} m/s • Luftfeuchte ${humidity}%`;
 }
 
+
+// ==========================================================
+// DYNAMISCHES HINTERGRUNDVIDEO
+// ==========================================================
 function updateBackgroundVideo(current) {
   const video = document.getElementById("bg-video");
-
-  // Sonnenaufgang & Sonnenuntergang
   const now = Date.now() / 1000;
   const sunrise = current.sys.sunrise;
   const sunset = current.sys.sunset;
 
   const isDay = now > sunrise && now < sunset;
-
-  // Wetter (Haupt-Kategorie)
   const condition = current.weather[0].main.toLowerCase();
 
   let src = "";
@@ -84,19 +124,15 @@ function updateBackgroundVideo(current) {
   if (isDay) {
     if (condition.includes("clear")) src = "mp4/sunny.mp4";
     else if (condition.includes("cloud")) src = "mp4/cloudy.mp4";
-    else if (condition.includes("rain")) src = "mp4/cloudy.mp4"; // bis du rain.mp4 hast
-    else if (condition.includes("snow")) src = "mp4/cloudy.mp4"; // placeholder
-    else if (condition.includes("fog") || condition.includes("mist")) src = "mp4/cloudy.mp4";
-    else src = "mp4/cloudy.mp4"; // fallback
+    else if (condition.includes("rain")) src = "mp4/cloudy.mp4";
+    else if (condition.includes("snow")) src = "mp4/cloudy.mp4";
+    else src = "mp4/cloudy.mp4";
   } else {
-    // NACHT
-    src = "mp4/cloudy.mp4"; // später night.mp4 hier einsetzen
+    src = "mp4/cloudy.mp4"; // Placeholder
   }
 
-  // Wenn das Video schon läuft → nichts tun
   if (video.getAttribute("src") === src) return;
 
-  // Smooth fade transition
   video.style.opacity = 0;
 
   setTimeout(() => {
@@ -106,9 +142,10 @@ function updateBackgroundVideo(current) {
   }, 400);
 }
 
-// ========================================
+
+// ==========================================================
 // METRICS
-// ========================================
+// ==========================================================
 function renderMetrics(data) {
   metricsGridEl.innerHTML = "";
 
@@ -124,17 +161,17 @@ function renderMetrics(data) {
   const daylightHours = ((sunset - sunrise) / 3600000).toFixed(1);
 
   const delta = feels - temp;
-  let comfort;
-  if (delta > 3) comfort = "fühlt sich wärmer an";
-  else if (delta < -3) comfort = "fühlt sich kälter an";
-  else comfort = "nahe an der Lufttemperatur";
+  let comfort =
+    delta > 3 ? "fühlt sich wärmer an" :
+    delta < -3 ? "fühlt sich kälter an" :
+    "nahe an der Lufttemperatur";
 
   const cards = [
     { title: "Gefühlte Temp.", value: `${feels}°C`, extra: comfort },
     { title: "Wind", value: `${wind} m/s`, extra: wind < 2 ? "fast windstill" : wind < 6 ? "leichter Wind" : "spürbarer Wind" },
     { title: "Luftfeuchte", value: `${humidity}%`, extra: humidity < 40 ? "eher trocken" : humidity < 70 ? "angenehm" : "sehr feucht" },
     { title: "Sichtweite", value: `${visibilityKm} km`, extra: visibilityKm > 8 ? "sehr klar" : "eingeschränkte Sicht" },
-    { title: "Luftdruck", value: `${pressure} hPa`, extra: pressure > 1015 ? "hochdrucklastig (stabil)" : pressure < 1005 ? "tiefdrucklastig (wechselhaft)" : "normal" },
+    { title: "Luftdruck", value: `${pressure} hPa`, extra: pressure > 1015 ? "hochdrucklastig" : pressure < 1005 ? "tiefdrucklastig" : "normal" },
     { title: "Tageslänge", value: `${daylightHours} h`, extra: `Sonne: ${formatTime(sunrise)} – ${formatTime(sunset)}` }
   ];
 
@@ -151,13 +188,13 @@ function renderMetrics(data) {
 }
 
 
-// ========================================
-// FORECAST
-// ========================================
+// ==========================================================
+// FORECAST – MIT TOUCH FIX
+// ==========================================================
 function renderForecast(forecast) {
   forecastTrackEl.innerHTML = "";
 
-  const list = forecast.list.slice(0, 8); // 24h
+  const list = forecast.list.slice(0, 8);
 
   list.forEach(item => {
     const dt = new Date(item.dt * 1000);
@@ -178,9 +215,61 @@ function renderForecast(forecast) {
 }
 
 
-// ========================================
+// ==========================================================
+// DRAGGING FIX (PC + TOUCH)
+// ==========================================================
+function initForecastDrag() {
+  const track = forecastTrackEl;
+
+  let isDown = false;
+  let startX = 0;
+  let scrollLeft = 0;
+
+  const min = () =>
+    Math.min(0, track.parentElement.offsetWidth - track.scrollWidth - 16);
+
+  // Desktop
+  track.addEventListener("mousedown", (e) => {
+    isDown = true;
+    startX = e.clientX - scrollLeft;
+    track.style.cursor = "grabbing";
+  });
+
+  window.addEventListener("mouseup", () => {
+    isDown = false;
+    track.style.cursor = "grab";
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!isDown) return;
+    scrollLeft = Math.max(min(), Math.min(0, e.clientX - startX));
+    track.style.transform = `translateX(${scrollLeft}px)`;
+  });
+
+  // Mobile
+  track.addEventListener("touchstart", (e) => {
+    isDown = true;
+    startX = e.touches[0].clientX - scrollLeft;
+  });
+
+  track.addEventListener("touchend", () => {
+    isDown = false;
+  });
+
+  track.addEventListener("touchmove", (e) => {
+    if (!isDown) return;
+
+    const x = e.touches[0].clientX - startX;
+    scrollLeft = Math.max(min(), Math.min(0, x));
+
+    track.style.transform = `translateX(${scrollLeft}px)`;
+  });
+}
+
+
+// ==========================================================
 // ADVANCED SECTION
-// ========================================
+// ==========================================================
 function renderAdvanced(data) {
   advancedGridEl.innerHTML = "";
 
@@ -193,7 +282,7 @@ function renderAdvanced(data) {
 
   const cards = [
     { title: "Taupunkt", value: `${dewPoint.toFixed(1)}°C`, extra: dewPointExplain(dewPoint) },
-    { title: "Cloud Cover", value: `${clouds}%`, extra: clouds < 25 ? "klar" : clouds < 70 ? "teils bewölkt" : "stark bewölkt" },
+    { title: "Bewölkung", value: `${clouds}%`, extra: clouds < 25 ? "klar" : clouds < 70 ? "teils bewölkt" : "stark bewölkt" },
     { title: "Thermischer Stress", value: thermalStress(feels), extra: `Gefühlt: ${Math.round(feels)}°C` },
     { title: "Wind Chill", value: windChillLabel(temp, wind), extra: "Wind beeinflusst das Temperaturempfinden" }
   ];
@@ -211,9 +300,9 @@ function renderAdvanced(data) {
 }
 
 
-// ========================================
-// MOON PHASE
-// ========================================
+// ==========================================================
+// MOND
+// ==========================================================
 function renderMoon(current) {
   const card = document.getElementById("moon-card");
   if (!card) return;
@@ -248,9 +337,9 @@ function computeMoonPhase(date) {
 }
 
 
-// ========================================
-// WIND COMPASS
-// ========================================
+// ==========================================================
+// WIND
+// ==========================================================
 function renderWindCompass(current) {
   const card = document.getElementById("wind-card");
   if (!card) return;
@@ -262,7 +351,8 @@ function renderWindCompass(current) {
   const strength =
     speed < 2 ? "fast windstill" :
     speed < 6 ? "leichter Wind" :
-    speed < 11 ? "mäßiger Wind" : "starker Wind";
+    speed < 11 ? "mäßiger Wind" :
+    "starker Wind";
 
   card.innerHTML = `
     <div class="wind-compass">
@@ -286,9 +376,9 @@ function degToDirection(deg) {
 }
 
 
-// ========================================
+// ==========================================================
 // RAIN WAVEFORM
-// ========================================
+// ==========================================================
 function renderRainWaveform(forecast) {
   const canvas = document.getElementById("rain-canvas");
   const caption = document.getElementById("rain-caption");
@@ -341,14 +431,14 @@ function renderRainWaveform(forecast) {
     ctx.fill();
   });
 
-  const avg = Math.round(pops.reduce((a,b) => a+b, 0) / pops.length * 100);
+  const avg = Math.round(pops.reduce((a,b) => a + b, 0) / pops.length * 100);
   caption.textContent = `Durchschnittliche Regenwahrscheinlichkeit: ${avg}%`;
 }
 
 
-// ========================================
+// ==========================================================
 // HEAT STRESS
-// ========================================
+// ==========================================================
 function renderHeatStress(current) {
   const feels = current.main.feels_like;
   const marker = document.getElementById("heat-marker");
@@ -364,9 +454,9 @@ function renderHeatStress(current) {
 }
 
 
-// ========================================
+// ==========================================================
 // HELPERS
-// ========================================
+// ==========================================================
 function formatTime(d) {
   return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }
@@ -414,67 +504,9 @@ function windChillLabel(t, w) {
 }
 
 
-// ========================================
-// FORECAST DRAGGING
-// ========================================
-function initForecastDrag() {
-  const track = forecastTrackEl;
-
-  let isDown = false;
-  let startX = 0;
-  let scrollLeft = 0;
-
-  const min = () =>
-    Math.min(0, track.parentElement.offsetWidth - track.scrollWidth - 16);
-
-  // ===========================================
-  // DESKTOP – MOUSE EVENTS
-  // ===========================================
-  track.addEventListener("mousedown", (e) => {
-    isDown = true;
-    startX = e.clientX - scrollLeft;
-    track.style.cursor = "grabbing";
-  });
-
-  window.addEventListener("mouseup", () => {
-    isDown = false;
-    track.style.cursor = "grab";
-  });
-
-  window.addEventListener("mousemove", (e) => {
-    if (!isDown) return;
-    scrollLeft = Math.max(min(), Math.min(0, e.clientX - startX));
-    track.style.transform = `translateX(${scrollLeft}px)`;
-  });
-
-
-  // ===========================================
-  // MOBILE – TOUCH EVENTS
-  // ===========================================
-  track.addEventListener("touchstart", (e) => {
-    isDown = true;
-    startX = e.touches[0].clientX - scrollLeft;
-  });
-
-  track.addEventListener("touchend", () => {
-    isDown = false;
-  });
-
-  track.addEventListener("touchmove", (e) => {
-    if (!isDown) return;
-
-    const x = e.touches[0].clientX - startX;
-
-    scrollLeft = Math.max(min(), Math.min(0, x));
-    track.style.transform = `translateX(${scrollLeft}px)`;
-  });
-}
-
-
-
-// ========================================
+// ==========================================================
 // INTRO ANIMATIONS
-// ========================================
+// ==========================================================
 function runIntroAnimations() {
   gsap.from(".hero-main", { y: 20, opacity: 0, duration: 0.8, ease: "power3.out" });
   gsap.from(".hero-sub", { y: 16, opacity: 0, duration: 0.8, delay: 0.1 });
@@ -486,136 +518,27 @@ function runIntroAnimations() {
 }
 
 
-// ========================================
-// MAXIMUM PARALLAX
-// ========================================
+// ==========================================================
+// PARALLAX
+// ==========================================================
 function enableMaximumParallax() {
   gsap.registerPlugin(ScrollTrigger);
 
-  // ----------------------------------------
-  // Ebene 1: Backgrounds (stärker)
-  // ----------------------------------------
-  gsap.to(".bg-gradient", {
-    y: 80,
-    scale: 1.08,
-    scrollTrigger: {
-      trigger: "body",
-      start: "top top",
-      end: "bottom bottom",
-      scrub: 1.5,
-    }
-  });
-
-  gsap.to(".orb-1", {
-    y: 120,
-    x: 50,
-    scale: 1.18,
-    scrollTrigger: {
-      trigger: "body",
-      start: "top top",
-      end: "bottom bottom",
-      scrub: 1.3,
-    }
-  });
-
-  gsap.to(".orb-2", {
-    y: -120,
-    x: -40,
-    scale: 1.15,
-    scrollTrigger: {
-      trigger: "body",
-      start: "top top",
-      end: "bottom bottom",
-      scrub: 1.3,
-    }
-  });
-
-  // ----------------------------------------
-  // Ebene 2: Hero (mittlere Stärke, startet früh)
-  // ----------------------------------------
-  gsap.to("#hero", {
-    y: 40,
-    scale: 0.94,
-    opacity: 0.85,
-    filter: "blur(2px)",
-    scrollTrigger: {
-      trigger: "#hero",
-      start: "top top",          // sofort aktiv!
-      end: "bottom+=150 top",     // viel kürzere Strecke
-      scrub: 1.0,
-    }
-  });
-
-  // ----------------------------------------
-  // Ebene 3: Sections (subtil!)
-  // ----------------------------------------
-  gsap.utils.toArray(".section").forEach((section, i) => {
-    gsap.fromTo(section,
-      { y: 0 },
-      {
-        y: i % 2 === 0 ? -18 : -10, // leichte Variation + Tiefe
-        scrollTrigger: {
-          trigger: section,
-          start: "top bottom-=100",  // PARALLAX STARTET FRÜHER!
-          end: "top center",
-          scrub: 1.0
-        }
-      }
-    );
-  });
-
-  // ----------------------------------------
-  // Ebene 4: Cards (ultraleicht)
-  // ----------------------------------------
-  gsap.utils.toArray(".card").forEach((card, i) => {
-    gsap.fromTo(card,
-      { y: 0, opacity: 1 },
-      {
-        y: -10,
-        opacity: 0.95,
-        scrollTrigger: {
-          trigger: card,
-          start: "top bottom", // sofort sichtbar
-          end: "top center",
-          scrub: 1.0,
-        }
-      }
-    );
-  });
-
-  // ----------------------------------------
-  // Scroll-Geschwindigkeit Glow (beibehalten)
-  // ----------------------------------------
-  const bg = document.querySelector(".bg-gradient");
-
-  ScrollTrigger.create({
-    trigger: "body",
-    start: "top top",
-    end: "bottom bottom",
-    onUpdate: self => {
-      const vel = Math.abs(self.getVelocity()) / 1400;
-      const blur = Math.min(vel * 5, 5);
-      const glow = Math.min(vel * 0.4, 0.5);
-      bg.style.filter = `blur(${blur}px) brightness(${1 + glow})`;
-    }
-  });
   gsap.to("#bg-video", {
-  y: 40,
-  scale: 1.05,
-  scrollTrigger: {
-    trigger: "body",
-    start: "top top",
-    end: "bottom bottom",
-    scrub: 1.4
-  }
-});
-
+    y: 40,
+    scale: 1.05,
+    scrollTrigger: {
+      trigger: "body",
+      start: "top top",
+      end: "bottom bottom",
+      scrub: 1.4
+    }
+  });
 }
 
 
-
-
-// ========================================
+// ==========================================================
 // START
-// ========================================
-loadWeather();
+// ==========================================================
+requestLocationAndLoad();
+
