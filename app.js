@@ -541,4 +541,41 @@ function enableMaximumParallax() {
 // START
 // ==========================================================
 requestLocationAndLoad();
+// ==========================================================
+// CITY SEARCH (AUTOCOMPLETE DROPDOWN)
+// ==========================================================
+const cityInput = document.getElementById("city-search");
+const cityResults = document.getElementById("city-results");
 
+if (cityInput) {
+  cityInput.addEventListener("input", async () => {
+    const query = cityInput.value.trim();
+    if (query.length < 2) {
+      cityResults.style.display = "none";
+      return;
+    }
+
+    const url = `https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${API_KEY}`;
+    const res = await fetch(url);
+    const cities = await res.json();
+
+    cityResults.innerHTML = "";
+    cityResults.style.display = "block";
+
+    cities.forEach(c => {
+      const item = document.createElement("div");
+      item.className = "city-result-item";
+      item.textContent = `${c.name}, ${c.country}`;
+
+      item.addEventListener("click", () => {
+        cityInput.value = `${c.name}, ${c.country}`;
+        cityResults.style.display = "none";
+
+        // Wetter für gewählten Ort laden
+        loadWeather(null, c.lat, c.lon);
+      });
+
+      cityResults.appendChild(item);
+    });
+  });
+}
