@@ -419,25 +419,57 @@ function windChillLabel(t, w) {
 // ========================================
 function initForecastDrag() {
   const track = forecastTrackEl;
-  let down = false, start = 0, curr = 0;
+
+  let isDown = false;
+  let startX = 0;
+  let scrollLeft = 0;
 
   const min = () =>
     Math.min(0, track.parentElement.offsetWidth - track.scrollWidth - 16);
 
-  track.onmousedown = e => {
-    down = true;
-    start = e.clientX - curr;
+  // ===========================================
+  // DESKTOP – MOUSE EVENTS
+  // ===========================================
+  track.addEventListener("mousedown", (e) => {
+    isDown = true;
+    startX = e.clientX - scrollLeft;
     track.style.cursor = "grabbing";
-  };
+  });
 
-  window.onmouseup = () => { down = false; track.style.cursor = "grab"; };
+  window.addEventListener("mouseup", () => {
+    isDown = false;
+    track.style.cursor = "grab";
+  });
 
-  window.onmousemove = e => {
-    if (!down) return;
-    curr = Math.max(min(), Math.min(0, e.clientX - start));
-    track.style.transform = `translateX(${curr}px)`;
-  };
+  window.addEventListener("mousemove", (e) => {
+    if (!isDown) return;
+    scrollLeft = Math.max(min(), Math.min(0, e.clientX - startX));
+    track.style.transform = `translateX(${scrollLeft}px)`;
+  });
+
+
+  // ===========================================
+  // MOBILE – TOUCH EVENTS
+  // ===========================================
+  track.addEventListener("touchstart", (e) => {
+    isDown = true;
+    startX = e.touches[0].clientX - scrollLeft;
+  });
+
+  track.addEventListener("touchend", () => {
+    isDown = false;
+  });
+
+  track.addEventListener("touchmove", (e) => {
+    if (!isDown) return;
+
+    const x = e.touches[0].clientX - startX;
+
+    scrollLeft = Math.max(min(), Math.min(0, x));
+    track.style.transform = `translateX(${scrollLeft}px)`;
+  });
 }
+
 
 
 // ========================================
