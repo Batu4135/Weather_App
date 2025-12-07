@@ -1,3 +1,5 @@
+/* === DEIN GANZER, AKTUALISIERTER CODE MIT OPTIMIERTER STADT-SUCHE === */
+
 // ==========================================================
 // API Setup
 // ==========================================================
@@ -50,11 +52,9 @@ async function loadWeather(city = null, lat = null, lon = null) {
     let currentUrl, forecastUrl;
 
     if (lat && lon) {
-      // Standort-Modus
       currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
       forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
     } else {
-      // Standardstadt
       city = city || DEFAULT_CITY;
       currentUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
       forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
@@ -68,7 +68,6 @@ async function loadWeather(city = null, lat = null, lon = null) {
     const current = await currentRes.json();
     const forecast = await forecastRes.json();
 
-    // Stadtname aktualisieren
     document.querySelector(".hero-city").textContent = current.name;
 
     renderHero(current);
@@ -108,7 +107,7 @@ function renderHero(data) {
 
 
 // ==========================================================
-// DYNAMISCHES HINTERGRUNDVIDEO
+// Hintergrundvideo dynamisch
 // ==========================================================
 function updateBackgroundVideo(current) {
   const video = document.getElementById("bg-video");
@@ -123,12 +122,9 @@ function updateBackgroundVideo(current) {
 
   if (isDay) {
     if (condition.includes("clear")) src = "mp4/sunny.mp4";
-    else if (condition.includes("cloud")) src = "mp4/cloudy.mp4";
-    else if (condition.includes("rain")) src = "mp4/cloudy.mp4";
-    else if (condition.includes("snow")) src = "mp4/cloudy.mp4";
     else src = "mp4/cloudy.mp4";
   } else {
-    src = "mp4/cloudy.mp4"; // Placeholder
+    src = "mp4/cloudy.mp4";
   }
 
   if (video.getAttribute("src") === src) return;
@@ -161,7 +157,7 @@ function renderMetrics(data) {
   const daylightHours = ((sunset - sunrise) / 3600000).toFixed(1);
 
   const delta = feels - temp;
-  let comfort =
+  const comfort =
     delta > 3 ? "fühlt sich wärmer an" :
     delta < -3 ? "fühlt sich kälter an" :
     "nahe an der Lufttemperatur";
@@ -189,7 +185,7 @@ function renderMetrics(data) {
 
 
 // ==========================================================
-// FORECAST – MIT TOUCH FIX
+// FORECAST + TOUCH FIX
 // ==========================================================
 function renderForecast(forecast) {
   forecastTrackEl.innerHTML = "";
@@ -216,7 +212,7 @@ function renderForecast(forecast) {
 
 
 // ==========================================================
-// DRAGGING FIX (PC + TOUCH)
+// DRAGGING (PC + TOUCH)
 // ==========================================================
 function initForecastDrag() {
   const track = forecastTrackEl;
@@ -228,7 +224,6 @@ function initForecastDrag() {
   const min = () =>
     Math.min(0, track.parentElement.offsetWidth - track.scrollWidth - 16);
 
-  // Desktop
   track.addEventListener("mousedown", (e) => {
     isDown = true;
     startX = e.clientX - scrollLeft;
@@ -246,7 +241,6 @@ function initForecastDrag() {
     track.style.transform = `translateX(${scrollLeft}px)`;
   });
 
-  // Mobile
   track.addEventListener("touchstart", (e) => {
     isDown = true;
     startX = e.touches[0].clientX - scrollLeft;
@@ -268,7 +262,7 @@ function initForecastDrag() {
 
 
 // ==========================================================
-// ADVANCED SECTION
+// ADVANCED
 // ==========================================================
 function renderAdvanced(data) {
   advancedGridEl.innerHTML = "";
@@ -325,6 +319,7 @@ function renderMoon(current) {
     </div>
   `;
 }
+
 
 function computeMoonPhase(date) {
   const synodicMonth = 29.53058867;
@@ -437,7 +432,7 @@ function renderRainWaveform(forecast) {
 
 
 // ==========================================================
-// HEAT STRESS
+// HEAT
 // ==========================================================
 function renderHeatStress(current) {
   const feels = current.main.feels_like;
@@ -505,16 +500,11 @@ function windChillLabel(t, w) {
 
 
 // ==========================================================
-// INTRO ANIMATIONS
+// ANIMATIONEN
 // ==========================================================
 function runIntroAnimations() {
-  gsap.from(".hero-main", { y: 20, opacity: 0, duration: 0.8, ease: "power3.out" });
+  gsap.from(".hero-main", { y: 20, opacity: 0, duration: 0.8 });
   gsap.from(".hero-sub", { y: 16, opacity: 0, duration: 0.8, delay: 0.1 });
-  gsap.from(".metric-card", { y: 24, opacity: 0, duration: 0.75, stagger: 0.06, delay: 0.15 });
-  gsap.from(".forecast-card", { y: 20, opacity: 0, duration: 0.7, stagger: 0.05, delay: 0.25 });
-  gsap.from(".advanced-card", { y: 26, opacity: 0, duration: 0.8, stagger: 0.07, delay: 0.35 });
-  gsap.from(".moon-card, .wind-card, .rain-card, .heat-card",
-    { y: 24, opacity: 0, duration: 0.8, stagger: 0.08, delay: 0.45 });
 }
 
 
@@ -541,28 +531,44 @@ function enableMaximumParallax() {
 // START
 // ==========================================================
 requestLocationAndLoad();
+
+
 // ==========================================================
-// CITY SEARCH (AUTOCOMPLETE DROPDOWN)
+// CITY SEARCH – NUR DE + TR & AUTO-SELECT BEIM FOKUS
 // ==========================================================
 const cityInput = document.getElementById("city-search");
 const cityResults = document.getElementById("city-results");
 
 if (cityInput) {
+
+  // ⭐ Beim Klick ins Feld → alles markieren
+  cityInput.addEventListener("focus", () => {
+    cityInput.select();
+  });
+
   cityInput.addEventListener("input", async () => {
     const query = cityInput.value.trim();
+
     if (query.length < 2) {
       cityResults.style.display = "none";
       return;
     }
 
-    const url = `https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${API_KEY}`;
-    const res = await fetch(url);
-    const cities = await res.json();
+    // Nur Deutschland und Türkei
+    const COUNTRIES = ["DE", "TR"];
+    let allResults = [];
+
+    for (const country of COUNTRIES) {
+      const url = `https://api.openweathermap.org/geo/1.0/direct?q=${query},${country}&limit=5&appid=${API_KEY}`;
+      const res = await fetch(url);
+      const cities = await res.json();
+      allResults = allResults.concat(cities);
+    }
 
     cityResults.innerHTML = "";
-    cityResults.style.display = "block";
+    cityResults.style.display = allResults.length ? "block" : "none";
 
-    cities.forEach(c => {
+    allResults.forEach(c => {
       const item = document.createElement("div");
       item.className = "city-result-item";
       item.textContent = `${c.name}, ${c.country}`;
@@ -571,7 +577,6 @@ if (cityInput) {
         cityInput.value = `${c.name}, ${c.country}`;
         cityResults.style.display = "none";
 
-        // Wetter für gewählten Ort laden
         loadWeather(null, c.lat, c.lon);
       });
 
@@ -579,3 +584,4 @@ if (cityInput) {
     });
   });
 }
+
