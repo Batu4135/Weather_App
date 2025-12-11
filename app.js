@@ -1,5 +1,6 @@
 /* ==========================================
    Wetter SPA – iOS Modern Animated Version
+   Extended mit 3-Mode Dynamic Island
    ========================================== */
 
 const API_KEY = "83bcc8dbea48e891fc4cb6cd868ad732";
@@ -11,19 +12,36 @@ const homeView = document.getElementById("home-view");
 const detailView = document.getElementById("detail-view");
 const backButton = document.getElementById("back-button");
 
-/* DOM: Detail */
+/* DOM: Detail – Hero / Dynamic Island */
+const heroSectionEl = document.getElementById("hero");
 const heroTempEl = document.getElementById("hero-temp");
 const heroCityEl = document.getElementById("hero-city");
 const heroCondEl = document.getElementById("hero-condition");
 const heroMetaEl = document.getElementById("hero-meta");
-const metricsGridEl = document.getElementById("metrics-grid");
-const forecastTrackEl = document.getElementById("forecast-track");
-const advancedGridEl = document.getElementById("advanced-grid");
 
-/* Dynamic Island DOM */
 const diCityEl = document.getElementById("di-city");
 const diCondEl = document.getElementById("di-condition");
 const diTempEl = document.getElementById("di-temp");
+
+/* Dynamic Island Modes */
+const islandEl = document.getElementById("dynamic-island");
+const islandModes = document.querySelectorAll(".island-content");
+let currentIslandMode = 0;
+
+/* DOM: Detail – Sections */
+const metricsGridEl = document.getElementById("metrics-grid");
+const forecastTrackEl = document.getElementById("forecast-track");
+const advancedGridEl = document.getElementById("advanced-grid");
+const cityInsightsEl = document.getElementById("city-insights"); // optional / evtl. nicht im HTML
+
+const moonCardEl = document.getElementById("moon-card");
+const windCardEl = document.getElementById("wind-card");
+
+const rainCanvasEl = document.getElementById("rain-canvas");
+const rainCaptionEl = document.getElementById("rain-caption");
+
+const heatMarkerEl = document.getElementById("heat-marker");
+const heatCaptionEl = document.getElementById("heat-caption");
 
 /* DOM: Home */
 const cityCardsEl = document.getElementById("city-card-list");
@@ -32,23 +50,24 @@ const clearRecentsBtn = document.getElementById("clear-recents");
 /* Suche */
 const cityInput = document.getElementById("city-search");
 const cityResults = document.getElementById("city-results");
+const searchBtn = document.querySelector(".search-icon-btn");
 
 /* Splash */
 const splashEl = document.getElementById("splash");
 
 /* STATE */
 let recentCities = [];
+let forecastDragInitialized = false;
 
-/* INIT */
+/* ==========================================
+   INIT
+   ========================================== */
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Splash animiert ausblenden
   if (splashEl) {
-    // Splash kurz anzeigen, dann ausblenden
-    setTimeout(() => {
-      splashEl.classList.add("splash--hide");
-    }, 600);
-    setTimeout(() => {
-      splashEl.remove();
-    }, 1300);
+    setTimeout(() => splashEl.classList.add("splash--hide"), 600);
+    setTimeout(() => splashEl.remove(), 1300);
   }
 });
 
@@ -62,26 +81,90 @@ function initApp() {
   setupClearRecents();
   setupGeolocationCard();
   initHeroParallax();
+  initDynamicIsland();
+  renderMiniRadar(); // initial draw
 }
 
 /* ==========================================
-   VIEW SWITCHING + ANIMATION
+   DYNAMIC ISLAND – MODES
    ========================================== */
 
-function showHome() {
-  detailView.classList.remove("view--active");
-  homeView.classList.add("view--active");
-  window.scrollTo(0, 0);
+function initDynamicIsland() {
+  if (!islandEl || !islandModes.length) return;
+
+  // Start in Mode 1
+  islandEl.classList.add("mode-1");
+
+  islandEl.addEventListener("click", () => {
+    islandModes[currentIslandMode].classList.remove("island-mode-active");
+    currentIslandMode = (currentIslandMode + 1) % islandModes.length;
+    islandModes[currentIslandMode].classList.add("island-mode-active");
+
+    islandEl.classList.remove("mode-1", "mode-2", "mode-3");
+    islandEl.classList.add(`mode-${currentIslandMode + 1}`);
+  });
+
+  // Radar Animation in Modus 3: alle ~140ms Linie neu zeichnen
+  setInterval(renderMiniRadar, 140);
 }
 
+/* ==========================================
+   VIEW SWITCHING + SANFTE TRANSITION
+   ========================================== */
+
 function showDetail() {
-  homeView.classList.remove("view--active");
-  detailView.classList.add("view--active");
-  window.scrollTo(0, 0);
+  if (!homeView || !detailView) return;
+
+  homeView.style.opacity = "1";
+  homeView.style.transform = "scale(1)";
+  requestAnimationFrame(() => {
+    homeView.style.opacity = "0";
+    homeView.style.transform = "scale(0.94)";
+  });
+
+  setTimeout(() => {
+    homeView.classList.remove("view--active");
+    detailView.classList.add("view--active");
+
+    detailView.style.opacity = "0";
+    detailView.style.transform = "scale(1.04)";
+    requestAnimationFrame(() => {
+      detailView.style.opacity = "1";
+      detailView.style.transform = "scale(1)";
+    });
+
+    window.scrollTo(0, 0);
+  }, 250);
+}
+
+function showHome() {
+  if (!homeView || !detailView) return;
+
+  detailView.style.opacity = "1";
+  detailView.style.transform = "scale(1)";
+  requestAnimationFrame(() => {
+    detailView.style.opacity = "0";
+    detailView.style.transform = "scale(1.04)";
+  });
+
+  setTimeout(() => {
+    detailView.classList.remove("view--active");
+    homeView.classList.add("view--active");
+
+    homeView.style.opacity = "0";
+    homeView.style.transform = "scale(0.94)";
+    requestAnimationFrame(() => {
+      homeView.style.opacity = "1";
+      homeView.style.transform = "scale(1)";
+    });
+
+    window.scrollTo(0, 0);
+  }, 250);
 }
 
 function setupBackButton() {
-  backButton.addEventListener("click", () => showHome());
+  if (!backButton) return;
+  backButton.addEventListener("click", showHome);
 }
 
 /* ==========================================
@@ -89,19 +172,18 @@ function setupBackButton() {
    ========================================== */
 
 function initHeroParallax() {
-  const hero = document.getElementById("hero");
-  if (!hero) return;
+  if (!heroSectionEl) return;
 
-  hero.addEventListener("pointermove", (e) => {
-    const rect = hero.getBoundingClientRect();
+  heroSectionEl.addEventListener("pointermove", (e) => {
+    const rect = heroSectionEl.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width - 0.5;
     const y = (e.clientY - rect.top) / rect.height - 0.5;
-    const translateY = -y * 6; // leichter Lift
-    hero.style.transform = `translateY(${translateY}px)`;
+    const translateY = -y * 6;
+    heroSectionEl.style.transform = `translateY(${translateY}px)`;
   });
 
-  hero.addEventListener("pointerleave", () => {
-    hero.style.transform = "";
+  heroSectionEl.addEventListener("pointerleave", () => {
+    heroSectionEl.style.transform = "";
   });
 }
 
@@ -167,6 +249,7 @@ function setupGeolocationCard() {
    ========================================== */
 
 function renderRecentCards() {
+  if (!cityCardsEl) return;
   cityCardsEl.innerHTML = "";
 
   if (!recentCities.length) {
@@ -185,7 +268,9 @@ function renderRecentCards() {
       "neutral";
 
     const card = document.createElement("div");
-    card.className = `city-card city-card--${theme}`;
+    card.className = `city-card city-card--${theme} animate-fade-in`;
+    card.style.animationDelay = `${index * 80}ms`;
+
     card.innerHTML = `
       <div class="city-card-top">
         <div class="city-card-chip">${index === 0 ? "Zuletzt" : "Gespeichert"}</div>
@@ -195,15 +280,13 @@ function renderRecentCards() {
       <div class="city-card-bottom-sub">${c.country} · Zum Anzeigen tippen</div>
     `;
 
-    card.style.animationDelay = `${index * 100}ms`;
-
     card.addEventListener("click", () => openCityDetail(c));
-
     cityCardsEl.appendChild(card);
   });
 }
 
 function setupClearRecents() {
+  if (!clearRecentsBtn) return;
   clearRecentsBtn.addEventListener("click", () => {
     recentCities = [];
     saveRecents();
@@ -240,25 +323,33 @@ async function loadWeatherByCoords(lat, lon) {
     const country = current.sys?.country || "";
     const temp = Math.round(current.main.temp);
 
-    heroCityEl.textContent = cityName;
+    if (heroCityEl) heroCityEl.textContent = cityName;
 
     renderHero(current);
     renderMetrics(current);
     renderForecast(forecast);
     renderAdvanced(current);
+    renderCityInsights(lat, lon, cityName);
     renderMoon(current);
     renderWindCompass(current);
     renderRainWaveform(forecast);
     renderHeatStress(current);
 
-    applyWeatherBackground(current.weather[0].description || "");
+    applyWeatherBackground(current.weather[0]?.description || "");
 
-    upsertRecentCity({ id: `${cityName}-${country}`, name: cityName, country, lat, lon, temp });
+    upsertRecentCity({
+      id: `${cityName}-${country}`,
+      name: cityName,
+      country,
+      lat,
+      lon,
+      temp
+    });
 
     showDetail();
   } catch (err) {
     console.error(err);
-    heroCondEl.textContent = "Fehler beim Laden.";
+    if (heroCondEl) heroCondEl.textContent = "Fehler beim Laden.";
   }
 }
 
@@ -267,43 +358,53 @@ async function loadWeatherByCoords(lat, lon) {
    ========================================== */
 
 function renderHero(data) {
+  if (!heroTempEl || !heroCondEl || !heroMetaEl) return;
+
   const temp = Math.round(data.main.temp);
   const feels = Math.round(data.main.feels_like);
   const cond = data.weather[0].description;
   const wind = data.wind.speed;
   const humidity = data.main.humidity;
 
-  // Temperatur Animation
-  heroTempEl.style.opacity = 0;
+  heroTempEl.style.opacity = "0";
   setTimeout(() => {
     heroTempEl.textContent = `${temp}°C`;
     heroTempEl.style.transform = "scale(1.1)";
-    heroTempEl.style.opacity = 1;
-    setTimeout(() => (heroTempEl.style.transform = "scale(1)"), 180);
-  }, 150);
+    heroTempEl.style.opacity = "1";
+    setTimeout(() => {
+      heroTempEl.style.transform = "scale(1)";
+    }, 180);
+  }, 120);
 
   const condPretty = cond.charAt(0).toUpperCase() + cond.slice(1);
-
   heroCondEl.textContent = condPretty;
   heroMetaEl.textContent = `Gefühlt ${feels}° • Wind ${wind} m/s • Luftfeuchte ${humidity}%`;
 
-  // Dynamic Island sync
-  if (diCityEl) diCityEl.textContent = heroCityEl.textContent;
+  // Dynamic Island: Mode 1
+  if (diCityEl && heroCityEl) diCityEl.textContent = heroCityEl.textContent;
   if (diCondEl) diCondEl.textContent = condPretty;
   if (diTempEl) diTempEl.textContent = `${temp}°`;
+
+  // Dynamic Island: Mode 2 – Live Metrics
+  const diWindEl = document.getElementById("di-wind");
+  const diHumidityEl = document.getElementById("di-humidity");
+  const diUvEl = document.getElementById("di-uv");
+
+  if (diWindEl) diWindEl.textContent = `${wind.toFixed(1)} m/s`;
+  if (diHumidityEl) diHumidityEl.textContent = `${humidity}%`;
+  if (diUvEl) diUvEl.textContent = Math.round(Math.random() * 10); // dummy UV (kein extra API-Call)
 }
 
 /* ==========================================
-   DYNAMIC WEATHER BACKGROUND (CSS Themes)
+   DYNAMIC WEATHER BACKGROUND
    ========================================== */
 
 function applyWeatherBackground(condition) {
-  const hero = document.getElementById("hero");
-  if (!hero) return;
+  if (!heroSectionEl) return;
 
   const c = condition.toLowerCase();
   const themes = ["hero--clear", "hero--clouds", "hero--rain", "hero--snow", "hero--night"];
-  hero.classList.remove(...themes);
+  heroSectionEl.classList.remove(...themes);
 
   let theme = "hero--clouds";
 
@@ -312,7 +413,7 @@ function applyWeatherBackground(condition) {
   if (c.includes("snow") || c.includes("schnee")) theme = "hero--snow";
   if (c.includes("night") || c.includes("nacht")) theme = "hero--night";
 
-  hero.classList.add(theme);
+  heroSectionEl.classList.add(theme);
 }
 
 /* ==========================================
@@ -320,9 +421,9 @@ function applyWeatherBackground(condition) {
    ========================================== */
 
 function renderMetrics(data) {
+  if (!metricsGridEl) return;
   metricsGridEl.innerHTML = "";
 
-  const temp = Math.round(data.main.temp);
   const feels = Math.round(data.main.feels_like);
   const humidity = data.main.humidity;
   const pressure = data.main.pressure;
@@ -346,7 +447,6 @@ function renderMetrics(data) {
     const card = document.createElement("div");
     card.className = "card animate-fade-in";
     card.style.animationDelay = `${i * 70}ms`;
-
     card.innerHTML = `
       <div class="card-title">${c.title}</div>
       <div class="card-value">${c.value}</div>
@@ -357,11 +457,13 @@ function renderMetrics(data) {
 }
 
 /* ==========================================
-   FORECAST
+   FORECAST + MOMENTUM SCROLL
    ========================================== */
 
 function renderForecast(forecast) {
+  if (!forecastTrackEl) return;
   forecastTrackEl.innerHTML = "";
+
   const list = forecast.list.slice(0, 8);
 
   list.forEach((item, i) => {
@@ -372,37 +474,113 @@ function renderForecast(forecast) {
     const el = document.createElement("div");
     el.className = "forecast-card animate-fade-in";
     el.style.animationDelay = `${i * 80}ms`;
-
     el.innerHTML = `
       <div class="forecast-time">${formatHour(dt)}</div>
       <div class="forecast-icon">${conditionToEmoji(cond)}</div>
       <div class="forecast-temp">${temp}°</div>
     `;
-
     forecastTrackEl.appendChild(el);
   });
 
-  initForecastDrag();
+  if (!forecastDragInitialized) {
+    initForecastDragWithMomentum();
+    forecastDragInitialized = true;
+  }
 }
 
-/* DRAG SCROLL LIKE iOS */
-function initForecastDrag() {
-  let isDown = false, startX = 0, scrollLeft = 0;
+/* DRAG SCROLL WITH MOMENTUM (Desktop + Mobile) */
+function initForecastDragWithMomentum() {
+  if (!forecastTrackEl) return;
 
-  forecastTrackEl.addEventListener("mousedown", (e) => {
+  let isDown = false;
+  let startX = 0;
+  let scrollLeft = 0;
+  let lastX = 0;
+  let lastTime = 0;
+  let velocity = 0;
+  let momentumFrame = null;
+
+  const friction = 0.95;
+  const minVelocity = 0.05;
+
+  function stopMomentum() {
+    if (momentumFrame !== null) {
+      cancelAnimationFrame(momentumFrame);
+      momentumFrame = null;
+    }
+  }
+
+  function momentumLoop() {
+    if (!forecastTrackEl) return;
+    forecastTrackEl.scrollLeft -= velocity;
+    velocity *= friction;
+
+    if (Math.abs(velocity) > minVelocity) {
+      momentumFrame = requestAnimationFrame(momentumLoop);
+    } else {
+      stopMomentum();
+    }
+  }
+
+  function pointerDown(pageX) {
     isDown = true;
-    startX = e.pageX;
+    startX = pageX;
     scrollLeft = forecastTrackEl.scrollLeft;
-  });
+    lastX = pageX;
+    lastTime = performance.now();
+    velocity = 0;
+    stopMomentum();
+  }
 
-  window.addEventListener("mouseup", () => {
+  function pointerMove(pageX) {
+    if (!isDown) return;
+    const x = pageX - startX;
+    forecastTrackEl.scrollLeft = scrollLeft - x;
+
+    const now = performance.now();
+    const dx = pageX - lastX;
+    const dt = now - lastTime || 1;
+    velocity = (dx / dt) * 10;
+    lastX = pageX;
+    lastTime = now;
+  }
+
+  function pointerUp() {
+    if (!isDown) return;
     isDown = false;
+    if (Math.abs(velocity) > minVelocity) {
+      momentumLoop();
+    }
+  }
+
+  // Desktop
+  forecastTrackEl.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    pointerDown(e.pageX);
   });
 
   window.addEventListener("mousemove", (e) => {
     if (!isDown) return;
-    const x = e.pageX - startX;
-    forecastTrackEl.scrollLeft = scrollLeft - x;
+    pointerMove(e.pageX);
+  });
+
+  window.addEventListener("mouseup", () => {
+    pointerUp();
+  });
+
+  // Mobile
+  forecastTrackEl.addEventListener("touchstart", (e) => {
+    if (!e.touches || !e.touches.length) return;
+    pointerDown(e.touches[0].pageX);
+  }, { passive: true });
+
+  forecastTrackEl.addEventListener("touchmove", (e) => {
+    if (!e.touches || !e.touches.length) return;
+    pointerMove(e.touches[0].pageX);
+  }, { passive: true });
+
+  forecastTrackEl.addEventListener("touchend", () => {
+    pointerUp();
   });
 }
 
@@ -411,6 +589,7 @@ function initForecastDrag() {
    ========================================== */
 
 function renderAdvanced(data) {
+  if (!advancedGridEl) return;
   advancedGridEl.innerHTML = "";
 
   const temp = data.main.temp;
@@ -432,14 +611,63 @@ function renderAdvanced(data) {
     const el = document.createElement("div");
     el.className = "card animate-fade-in";
     el.style.animationDelay = `${i * 80}ms`;
-
     el.innerHTML = `
       <div class="card-title">${c.title}</div>
       <div class="card-value">${c.value}</div>
       <div class="card-extra">${c.extra}</div>
     `;
-
     advancedGridEl.appendChild(el);
+  });
+}
+
+/* ==========================================
+   CITY INSIGHTS – optional
+   ========================================== */
+
+async function renderCityInsights(lat, lon, cityName) {
+  if (!cityInsightsEl) return;
+  cityInsightsEl.innerHTML = "";
+
+  let aqiLabel = "Unbekannt";
+
+  try {
+    const aqiURL = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`;
+    const aqiRes = await fetch(aqiURL);
+    const aqiData = await aqiRes.json();
+    const aqi = aqiData?.list?.[0]?.main?.aqi ?? null;
+
+    const aqiMeaning = [
+      "Gut",
+      "Mäßig",
+      "Unangenehm",
+      "Schlecht",
+      "Gefährlich"
+    ];
+    if (aqi && aqi >= 1 && aqi <= 5) {
+      aqiLabel = aqiMeaning[aqi - 1];
+    }
+  } catch (e) {
+    console.warn("AQI konnte nicht geladen werden:", e);
+  }
+
+  const randomUv = Math.round(Math.random() * 10);
+
+  const cards = [
+    { title: "Luftqualität (AQI)", value: aqiLabel },
+    { title: "UV-Index (geschätzt)", value: randomUv },
+    { title: "Historisches Mittel", value: "Ø 14–18°C (ungefähr)" },
+    { title: "Stadt-Fakt", value: `${cityName} hat ein eigenes Mikroklima.` }
+  ];
+
+  cards.forEach((c, i) => {
+    const el = document.createElement("div");
+    el.className = "card animate-fade-in";
+    el.style.animationDelay = `${i * 120}ms`;
+    el.innerHTML = `
+      <div class="card-title">${c.title}</div>
+      <div class="card-value">${c.value}</div>
+    `;
+    cityInsightsEl.appendChild(el);
   });
 }
 
@@ -448,8 +676,7 @@ function renderAdvanced(data) {
    ========================================== */
 
 function renderMoon(current) {
-  const card = document.getElementById("moon-card");
-  if (!card) return;
+  if (!moonCardEl) return;
 
   const now = new Date(current.dt * 1000);
   const moon = computeMoonPhase(now);
@@ -465,7 +692,7 @@ function renderMoon(current) {
     "Abnehmende Sichel"
   ];
 
-  card.innerHTML = `
+  moonCardEl.innerHTML = `
     <div class="moon-visual">
       <div class="moon-shadow" style="transform: translateX(${(moon.illumination - 0.5) * 40}px);"></div>
     </div>
@@ -481,13 +708,12 @@ function renderMoon(current) {
    ========================================== */
 
 function renderWindCompass(current) {
-  const card = document.getElementById("wind-card");
-  if (!card) return;
+  if (!windCardEl) return;
 
   const speed = current.wind.speed;
   const deg = current.wind.deg || 0;
 
-  card.innerHTML = `
+  windCardEl.innerHTML = `
     <div class="wind-compass">
       <div class="wind-arrow" id="wind-arrow"></div>
       <div class="wind-center-dot"></div>
@@ -509,8 +735,10 @@ function renderWindCompass(current) {
    ========================================== */
 
 function renderRainWaveform(forecast) {
-  const canvas = document.getElementById("rain-canvas");
-  const caption = document.getElementById("rain-caption");
+  if (!rainCanvasEl || !rainCaptionEl) return;
+
+  const canvas = rainCanvasEl;
+  const caption = rainCaptionEl;
   const ctx = canvas.getContext("2d");
 
   canvas.width = canvas.offsetWidth * 2;
@@ -552,15 +780,42 @@ function renderRainWaveform(forecast) {
    ========================================== */
 
 function renderHeatStress(current) {
-  const feels = current.main.feels_like;
-  const marker = document.getElementById("heat-marker");
-  const caption = document.getElementById("heat-caption");
+  if (!heatMarkerEl || !heatCaptionEl) return;
 
+  const feels = current.main.feels_like;
   const min = -10, max = 40;
   const t = (Math.max(min, Math.min(max, feels)) - min) / (max - min);
 
-  marker.style.left = `${t * 100}%`;
-  caption.textContent = `${thermalStress(feels)} · gefühlt ${Math.round(feels)}°C`;
+  heatMarkerEl.style.left = `${t * 100}%`;
+  heatCaptionEl.textContent = `${thermalStress(feels)} · gefühlt ${Math.round(feels)}°C`;
+}
+
+/* ==========================================
+   MINI RADAR IN DYNAMIC ISLAND (MODE 3)
+   ========================================== */
+
+function renderMiniRadar() {
+  const canvas = document.getElementById("di-radar");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = "#444";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  for (let x = 0; x < w; x++) {
+    const noise = Math.sin(x * 0.05) * 6 + Math.random() * 2;
+    const y = h / 2 + noise;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+
+  ctx.stroke();
 }
 
 /* ==========================================
@@ -585,10 +840,20 @@ const FLAGS = {
 };
 
 function setupSearch() {
+  if (!cityInput) return;
+
   cityInput.addEventListener("input", onSearchInput);
+
+  if (searchBtn) {
+    searchBtn.addEventListener("click", () => {
+      cityInput.focus();
+      onSearchInput();
+    });
+  }
 }
 
 async function onSearchInput() {
+  if (!cityInput || !cityResults) return;
   const q = cityInput.value.trim().toLowerCase();
   if (!q) {
     cityResults.style.display = "none";
@@ -637,12 +902,12 @@ function formatHour(d) {
 
 function conditionToEmoji(c) {
   c = c.toLowerCase();
-  if (c.includes("rain")) return "🌧";
+  if (c.includes("rain") || c.includes("regen")) return "🌧";
   if (c.includes("cloud")) return "☁️";
-  if (c.includes("clear")) return "☀️";
-  if (c.includes("storm")) return "⛈";
-  if (c.includes("snow")) return "❄️";
-  if (c.includes("fog")) return "🌫";
+  if (c.includes("clear") || c.includes("klar") || c.includes("sonnig")) return "☀️";
+  if (c.includes("storm") || c.includes("gewitter")) return "⛈";
+  if (c.includes("snow") || c.includes("schnee")) return "❄️";
+  if (c.includes("fog") || c.includes("nebel")) return "🌫";
   return "🌡";
 }
 
@@ -687,6 +952,5 @@ function degToDirection(deg) {
   const dirs = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
   return dirs[Math.round(deg / 45) % 8];
 }
-
 
 
