@@ -1,6 +1,5 @@
 /* ==========================================
    Wetter SPA – iOS Modern Animated Version
-   Extended mit 3-Mode Dynamic Island
    ========================================== */
 
 const API_KEY = "83bcc8dbea48e891fc4cb6cd868ad732";
@@ -12,21 +11,12 @@ const homeView = document.getElementById("home-view");
 const detailView = document.getElementById("detail-view");
 const backButton = document.getElementById("back-button");
 
-/* DOM: Detail – Hero / Dynamic Island */
+/* DOM: Detail – Hero */
 const heroSectionEl = document.getElementById("hero");
 const heroTempEl = document.getElementById("hero-temp");
 const heroCityEl = document.getElementById("hero-city");
 const heroCondEl = document.getElementById("hero-condition");
 const heroMetaEl = document.getElementById("hero-meta");
-
-const diCityEl = document.getElementById("di-city");
-const diCondEl = document.getElementById("di-condition");
-const diTempEl = document.getElementById("di-temp");
-
-/* Dynamic Island Modes */
-const islandEl = document.getElementById("dynamic-island");
-const islandModes = document.querySelectorAll(".island-content");
-let currentIslandMode = 0;
 
 /* DOM: Detail – Sections */
 const metricsGridEl = document.getElementById("metrics-grid");
@@ -45,7 +35,6 @@ const heatCaptionEl = document.getElementById("heat-caption");
 
 /* DOM: Home */
 const cityCardsEl = document.getElementById("city-card-list");
-const clearRecentsBtn = document.getElementById("clear-recents");
 
 /* Suche */
 const cityInput = document.getElementById("city-search");
@@ -78,34 +67,8 @@ function initApp() {
   renderRecentCards();
   setupSearch();
   setupBackButton();
-  setupClearRecents();
   setupGeolocationCard();
   initHeroParallax();
-  initDynamicIsland();
-  renderMiniRadar(); // initial draw
-}
-
-/* ==========================================
-   DYNAMIC ISLAND – MODES
-   ========================================== */
-
-function initDynamicIsland() {
-  if (!islandEl || !islandModes.length) return;
-
-  // Start in Mode 1
-  islandEl.classList.add("mode-1");
-
-  islandEl.addEventListener("click", () => {
-    islandModes[currentIslandMode].classList.remove("island-mode-active");
-    currentIslandMode = (currentIslandMode + 1) % islandModes.length;
-    islandModes[currentIslandMode].classList.add("island-mode-active");
-
-    islandEl.classList.remove("mode-1", "mode-2", "mode-3");
-    islandEl.classList.add(`mode-${currentIslandMode + 1}`);
-  });
-
-  // Radar Animation in Modus 3: alle ~140ms Linie neu zeichnen
-  setInterval(renderMiniRadar, 140);
 }
 
 /* ==========================================
@@ -204,8 +167,43 @@ function saveRecents() {
 }
 
 function upsertRecentCity(city) {
+  const isLocation = city.id === "location";
+
+  // Wenn Standort: immer an Position 0 setzen
+  if (isLocation) {
+    // Entferne alte Standortkarte (falls vorhanden)
+    recentCities = recentCities.filter((c) => c.id !== "location");
+
+    // Standort VORNE einfügen
+    recentCities.unshift(city);
+
+    saveRecents();
+    renderRecentCards();
+    return;
+  }
+
+  // Prüfen ob diese Stadt dieselben Koordinaten wie der Standort hat
+  const loc = recentCities.find((c) => c.id === "location");
+  if (
+    loc &&
+    Math.abs(loc.lat - city.lat) < 0.01 &&
+    Math.abs(loc.lon - city.lon) < 0.01
+  ) {
+    // dieselbe Stadt wie Standort → NICHT speichern
+    return;
+  }
+
+  // Normale Städte entfernen
   recentCities = recentCities.filter((c) => c.id !== city.id);
-  recentCities.unshift(city);
+
+  // Wenn Standort vorhanden → Stadt hinter Standort einfügen
+  if (loc) {
+    recentCities.splice(1, 0, city);
+  } else {
+    recentCities.unshift(city);
+  }
+
+  // Begrenzen
   if (recentCities.length > 10) recentCities.length = 10;
 
   saveRecents();
@@ -229,12 +227,13 @@ function setupGeolocationCard() {
       const data = await res.json();
 
       const city = {
-        id: `loc-${lat.toFixed(2)}-${lon.toFixed(2)}`,
-        name: data.name || "Standort",
+        id: "location", // feste ID für Standort
+        name: data.name || "Mein Standort",
         country: data.sys?.country || "",
         lat,
         lon,
-        temp: Math.round(data.main.temp)
+        temp: Math.round(data.main.temp),
+        isLocation: true
       };
 
       upsertRecentCity(city);
@@ -271,27 +270,50 @@ function renderRecentCards() {
     card.className = `city-card city-card--${theme} animate-fade-in`;
     card.style.animationDelay = `${index * 80}ms`;
 
+    const label = c.isLocation
+      ? "Mein Standort"
+      : (index === 0 ? "Zuletzt" : "Gespeichert");
+
+    const subtitle = c.isLocation
+      ? `${c.country || "Standort"} · Zum Anzeigen tippen`
+      : `${c.country} · Zum Anzeigen tippen`;
+
     card.innerHTML = `
       <div class="city-card-top">
-        <div class="city-card-chip">${index === 0 ? "Zuletzt" : "Gespeichert"}</div>
+        <div class="city-card-chip">${label}</div>
         <div class="city-card-temp">${c.temp}°</div>
       </div>
+
+      ${!c.isLocation ? `<div class="city-card-delete">🗑️</div>` : ""}
+
       <div class="city-card-bottom-title">${c.name}</div>
-      <div class="city-card-bottom-sub">${c.country} · Zum Anzeigen tippen</div>
+      <div class="city-card-bottom-sub">${subtitle}</div>
     `;
 
+    // Card öffnen
     card.addEventListener("click", () => openCityDetail(c));
+
+    // Lösch-Icon (nur wenn nicht Standort)
+    if (!c.isLocation) {
+      const delBtn = card.querySelector(".city-card-delete");
+      if (delBtn) {
+        delBtn.addEventListener("click", (e) => {
+          e.stopPropagation(); // verhindert, dass die Card geöffnet wird
+          deleteCity(c.id);
+        });
+      }
+    }
+
     cityCardsEl.appendChild(card);
   });
 }
 
-function setupClearRecents() {
-  if (!clearRecentsBtn) return;
-  clearRecentsBtn.addEventListener("click", () => {
-    recentCities = [];
-    saveRecents();
-    renderRecentCards();
-  });
+function deleteCity(id) {
+  // Standort kann nicht gelöscht werden
+  if (id === "location") return;
+  recentCities = recentCities.filter((c) => c.id !== id);
+  saveRecents();
+  renderRecentCards();
 }
 
 /* ==========================================
@@ -379,20 +401,6 @@ function renderHero(data) {
   const condPretty = cond.charAt(0).toUpperCase() + cond.slice(1);
   heroCondEl.textContent = condPretty;
   heroMetaEl.textContent = `Gefühlt ${feels}° • Wind ${wind} m/s • Luftfeuchte ${humidity}%`;
-
-  // Dynamic Island: Mode 1
-  if (diCityEl && heroCityEl) diCityEl.textContent = heroCityEl.textContent;
-  if (diCondEl) diCondEl.textContent = condPretty;
-  if (diTempEl) diTempEl.textContent = `${temp}°`;
-
-  // Dynamic Island: Mode 2 – Live Metrics
-  const diWindEl = document.getElementById("di-wind");
-  const diHumidityEl = document.getElementById("di-humidity");
-  const diUvEl = document.getElementById("di-uv");
-
-  if (diWindEl) diWindEl.textContent = `${wind.toFixed(1)} m/s`;
-  if (diHumidityEl) diHumidityEl.textContent = `${humidity}%`;
-  if (diUvEl) diUvEl.textContent = Math.round(Math.random() * 10); // dummy UV (kein extra API-Call)
 }
 
 /* ==========================================
@@ -788,34 +796,6 @@ function renderHeatStress(current) {
 
   heatMarkerEl.style.left = `${t * 100}%`;
   heatCaptionEl.textContent = `${thermalStress(feels)} · gefühlt ${Math.round(feels)}°C`;
-}
-
-/* ==========================================
-   MINI RADAR IN DYNAMIC ISLAND (MODE 3)
-   ========================================== */
-
-function renderMiniRadar() {
-  const canvas = document.getElementById("di-radar");
-  if (!canvas) return;
-
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width;
-  const h = canvas.height;
-
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.strokeStyle = "#444";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-
-  for (let x = 0; x < w; x++) {
-    const noise = Math.sin(x * 0.05) * 6 + Math.random() * 2;
-    const y = h / 2 + noise;
-    if (x === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-
-  ctx.stroke();
 }
 
 /* ==========================================
