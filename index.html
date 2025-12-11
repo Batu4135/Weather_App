@@ -1,146 +1,172 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Istanbul Wetter – Neon Future</title>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  />
+  <title>Wetter App</title>
 
-  <!-- iOS / PWA -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Istanbul Wetter – Neon Future">
-  <link rel="apple-touch-icon" href="icon-192.png">
-
-  <!-- Manifest für PWA -->
-  <link rel="manifest" href="manifest.json">
-
-  <!-- GSAP Animation Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="style.css">
+  <!-- iOS / PWA Basics -->
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Du kannst später ein echtes Icon hier hinterlegen -->
+  <link rel="icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
 </head>
 <body>
-  <!-- Hintergrundvideo -->
-  <video id="bg-video" class="bg-video" autoplay muted loop playsinline></video>
 
-  <!-- Futuristischer Gradient-Background -->
-  <div class="bg-orb orb-1"></div>
-  <div class="bg-orb orb-2"></div>
-  <div class="bg-noise"></div>
+  <!-- Splash Screen -->
+  <div id="splash" class="splash-screen">
+    <div class="splash-inner">
+      <div class="splash-icon">
+        <span class="splash-icon-sun">☀️</span>
+        <span class="splash-icon-cloud">☁️</span>
+      </div>
+      <div class="splash-title">Wetter Universe</div>
+      <div class="splash-subtitle">Lädt dein Klima-Kosmos...</div>
+    </div>
+  </div>
 
   <main class="page">
-    <!-- HERO -->
-    <section id="hero" class="hero">
-      <div class="hero-main">
-        <div class="hero-temp" id="hero-temp">--°C</div>
-        <div class="hero-city">Istanbul</div>
-        <div class="hero-condition" id="hero-condition">Lade Wetter...</div>
-      </div>
-      <div class="hero-sub">
-        <div class="hero-meta" id="hero-meta">---</div>
-      </div>
-    </section>
 
-    <!-- STANDORT WÄHLEN (Suche mit Dropdown) -->
-    <section class="section">
-      <h2 class="section-title">Standort wählen</h2>
+    <!-- =========================
+         HOME VIEW
+         ========================= -->
+    <div id="home-view" class="view view--active">
 
-      <div class="city-selector">
-        <input
-          id="city-search"
-          class="city-search-input"
-          type="text"
-          placeholder="Stadt suchen..."
-          autocomplete="off"
-        />
-        <div id="city-results" class="city-results"></div>
-      </div>
-    </section>
+      <header class="home-header">
+        <div class="home-header-top">
+          <div>
+            <div class="home-hello">Hi, David 👋</div>
+            <div class="home-subtitle">Entdecke das Wetter der Welt</div>
+          </div>
 
-    <!-- QUICK METRICS -->
-    <section class="section">
-      <h2 class="section-title">Aktuelle Werte</h2>
-      <div id="metrics-grid" class="metrics-grid">
-        <!-- Cards werden per JS befüllt -->
-      </div>
-    </section>
-
-    <!-- FORECAST SLIDER -->
-    <section class="section">
-      <h2 class="section-title">Nächste Stunden</h2>
-      <div class="forecast-strip" id="forecast-strip">
-        <div class="forecast-track" id="forecast-track">
-          <!-- Forecast Cards via JS -->
+          <div class="home-avatar">WU</div>
         </div>
-      </div>
-      <div class="hint">Tipp: Leiste nach links/rechts ziehen</div>
-    </section>
 
-    <!-- ADVANCED INFO -->
-    <section class="section">
-      <h2 class="section-title">Advanced Insights</h2>
-      <div id="advanced-grid" class="advanced-grid">
-        <!-- Advanced Cards via JS -->
-      </div>
+        <!-- Suchfeld -->
+        <div class="home-search">
+          <div class="search-bar">
+            <input
+              id="city-search"
+              class="city-search-input"
+              type="text"
+              placeholder="Stadt suchen..."
+              autocomplete="off"
+            />
+            <button class="search-icon-btn">⌕</button>
+          </div>
 
-      <!-- COSMIC & DYNAMICS -->
-      <section class="section">
-        <h2 class="section-title">Cosmic & Dynamics</h2>
-        <div class="metrics-grid">
-          <div id="moon-card" class="card moon-card">
-            <!-- wird per JS gefüllt -->
-          </div>
-          <div id="wind-card" class="card wind-card">
-            <!-- wird per JS gefüllt -->
-          </div>
+          <div id="city-results" class="city-results"></div>
+        </div>
+      </header>
+
+      <!-- Zuletzt angesehene Städte -->
+      <section class="home-section">
+        <div class="home-section-header">
+          <h2 class="home-section-title">Zuletzt angesehen</h2>
+          <button id="clear-recents" class="home-section-link">Leeren</button>
+        </div>
+
+        <div id="city-card-list" class="city-card-row">
+          <!-- Karten werden per JS generiert -->
         </div>
       </section>
 
-      <!-- RAIN & COMFORT -->
+    </div>
+
+    <!-- =========================
+         DETAIL VIEW
+         ========================= -->
+    <div id="detail-view" class="view">
+
+      <button id="back-button" class="back-button">← Zurück</button>
+
+      <!-- HERO Wetterübersicht mit Dynamic Island -->
+      <section id="hero" class="hero hero--clouds">
+        <!-- Dynamic Island -->
+        <div class="dynamic-island">
+          <div class="di-left">
+            <span id="di-city" class="di-city">—</span>
+            <span id="di-condition" class="di-condition">Lade Wetter...</span>
+          </div>
+          <div class="di-right">
+            <span id="di-temp" class="di-temp">--°</span>
+          </div>
+        </div>
+
+        <div class="hero-main">
+          <div class="hero-temp" id="hero-temp">--°C</div>
+          <div class="hero-city" id="hero-city">—</div>
+          <div class="hero-condition" id="hero-condition">Lade Wetter...</div>
+          <div class="hero-meta" id="hero-meta">---</div>
+        </div>
+      </section>
+
+      <!-- AKTUELLE WERTE -->
+      <section class="section">
+        <h2 class="section-title">Aktuelle Werte</h2>
+        <div id="metrics-grid" class="metrics-grid"></div>
+      </section>
+
+      <!-- VORHERSAGE -->
+      <section class="section">
+        <h2 class="section-title">Nächste Stunden</h2>
+        <div class="forecast-strip">
+          <div id="forecast-track" class="forecast-track"></div>
+        </div>
+      </section>
+
+      <!-- ADVANCED INSIGHTS -->
+      <section class="section">
+        <h2 class="section-title">Weitere Einblicke</h2>
+        <div id="advanced-grid" class="advanced-grid"></div>
+      </section>
+
+      <!-- COSMIC / WIND -->
+      <section class="section">
+        <h2 class="section-title">Cosmic & Dynamics</h2>
+        <div class="metrics-grid">
+          <div id="moon-card" class="card"></div>
+          <div id="wind-card" class="card"></div>
+        </div>
+      </section>
+
+      <!-- REGEN & HEAT -->
       <section class="section">
         <h2 class="section-title">Rain & Comfort</h2>
 
-        <div id="rain-card" class="card rain-card">
+        <div id="rain-card" class="card">
           <div class="card-title">Regenwahrscheinlichkeit</div>
           <canvas id="rain-canvas"></canvas>
           <div class="card-extra" id="rain-caption"></div>
         </div>
 
-        <div id="heat-card" class="card heat-card">
-          <div class="card-title">Komfort / Heat Stress</div>
+        <div id="heat-card" class="card">
+          <div class="card-title">Komfort / Hitzegefühl</div>
+
           <div class="heat-scale">
             <div class="heat-labels">
-              <span>Frost</span>
-              <span>Kalt</span>
-              <span>Cool</span>
-              <span>Comfort</span>
-              <span>Warm</span>
-              <span>Hot</span>
-              <span>Danger</span>
+              <span>Frost</span><span>Kalt</span><span>Cool</span>
+              <span>Comfort</span><span>Warm</span><span>Hot</span><span>Danger</span>
             </div>
+
             <div class="heat-track">
               <div class="heat-gradient"></div>
               <div class="heat-marker" id="heat-marker"></div>
             </div>
           </div>
+
           <div class="card-extra" id="heat-caption"></div>
         </div>
+
       </section>
-    </section>
-    
+
+    </div>
   </main>
 
-  <!-- App Script -->
   <script src="app.js"></script>
-
-  <!-- Service Worker aktivieren -->
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js");
-    }
-  </script>
 </body>
 </html>
-
