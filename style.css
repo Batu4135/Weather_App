@@ -34,7 +34,13 @@ body {
 }
 
 body.theme-night {
-  background: radial-gradient(circle at top, #050814, #020308 65%, #010104);
+  background:
+    radial-gradient(circle at top, rgba(5, 8, 20, 0.75), rgba(1, 1, 4, 0.95)),
+    url("assets/img/StarSky.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 body.theme-day {
@@ -56,6 +62,10 @@ body.theme-clear {
   z-index: 0;
   overflow: hidden;
   filter: drop-shadow(0 40px 100px rgba(0,0,0,0.35));
+}
+
+.ambient-layer {
+  display: none;
 }
 
 .ambient-shape {
@@ -150,6 +160,20 @@ body.theme-clear .sun-orb {
   height: 6px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.15);
+}
+
+body.view-detail-active .page {
+  background: linear-gradient(145deg, rgba(255,255,255,0.72), rgba(255,255,255,0.4));
+  backdrop-filter: blur(32px) saturate(190%);
+}
+
+body.theme-night.view-detail-active .page {
+  background: linear-gradient(160deg, rgba(4, 7, 15, 0.6), rgba(1, 3, 9, 0.78));
+  color: #f1f5f9;
+}
+
+body.theme-night.view-detail-active .section-title {
+  color: #e2e8f0;
 }
 
 /* ===========================================
@@ -435,6 +459,14 @@ body.theme-clear .sun-orb {
   animation: cardPop 0.7s cubic-bezier(.22,.61,.36,1) forwards;
 }
 
+body.theme-night.view-detail-active .card {
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  box-shadow:
+    0 10px 30px rgba(0,0,0,0.35),
+    inset 0 0 10px rgba(15, 23, 42, 0.6);
+}
+
 .card-title {
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -454,6 +486,11 @@ body.theme-clear .sun-orb {
   font-size: 0.9rem;
 }
 
+body.theme-night.view-detail-active .card-title,
+body.theme-night.view-detail-active .card-extra {
+  color: rgba(226, 232, 240, 0.85);
+}
+
 /* Metrics grid */
 .metrics-grid {
   display: grid;
@@ -470,9 +507,21 @@ body.theme-clear .sun-orb {
 /* Forecast horizontal strip */
 .forecast-strip {
   padding: 14px;
-  background: rgba(255,255,255,0.55);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(145deg, rgba(14,22,42,0.88), rgba(5,10,24,0.75));
+  color: #f1f5f9;
+  backdrop-filter: blur(14px) saturate(180%);
   border-radius: 20px;
+  border: 1px solid rgba(148,163,184,0.15);
+  box-shadow:
+    0 18px 35px rgba(2,6,23,0.45),
+    inset 0 0 8px rgba(15,23,42,0.6);
+}
+
+body.theme-day .forecast-strip,
+body.theme-clear .forecast-strip {
+  background: rgba(255,255,255,0.65);
+  color: #0f172a;
+  border-color: rgba(255,255,255,0.4);
   box-shadow: var(--shadow-soft);
 }
 
@@ -495,13 +544,19 @@ body.theme-clear .sun-orb {
 
 .forecast-time {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: rgba(226,232,240,0.92);
+  letter-spacing: 0.02em;
 }
 
 .forecast-temp {
   font-size: 1.1rem;
   font-weight: 600;
   margin-top: 4px;
+}
+
+body.theme-day .forecast-time,
+body.theme-clear .forecast-time {
+  color: #475569;
 }
 .city-card-delete {
   position: absolute;
@@ -538,8 +593,16 @@ body.theme-clear .sun-orb {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  background-color: #030712;
   z-index: 0;
-  opacity: 0.9;
+  opacity: 0;
+  display: none;
+  transition: opacity 0.6s ease;
+}
+
+.hero.hero--night .hero-video {
+  display: block;
+  opacity: 0.85;
 }
 
 .hero::after {
