@@ -22,16 +22,13 @@ const heroMetaEl = document.getElementById("hero-meta");
 const metricsGridEl = document.getElementById("metrics-grid");
 const forecastTrackEl = document.getElementById("forecast-track");
 const advancedGridEl = document.getElementById("advanced-grid");
-const cityInsightsEl = document.getElementById("city-insights"); // optional / evtl. nicht im HTML
-
-const moonCardEl = document.getElementById("moon-card");
-const windCardEl = document.getElementById("wind-card");
 
 const rainCanvasEl = document.getElementById("rain-canvas");
 const rainCaptionEl = document.getElementById("rain-caption");
 
 const heatMarkerEl = document.getElementById("heat-marker");
 const heatCaptionEl = document.getElementById("heat-caption");
+const sunOrbEl = document.getElementById("sun-orb");
 
 /* DOM: Home */
 const cityCardsEl = document.getElementById("city-card-list");
@@ -351,13 +348,11 @@ async function loadWeatherByCoords(lat, lon) {
     renderMetrics(current);
     renderForecast(forecast);
     renderAdvanced(current);
-    renderCityInsights(lat, lon, cityName);
-    renderMoon(current);
-    renderWindCompass(current);
     renderRainWaveform(forecast);
     renderHeatStress(current);
 
-    applyWeatherBackground(current.weather[0]?.description || "");
+    applyWeatherBackground(current);
+    setAtmosphereTheme(current);
 
     upsertRecentCity({
       id: `${cityName}-${country}`,
@@ -407,9 +402,10 @@ function renderHero(data) {
    DYNAMIC WEATHER BACKGROUND
    ========================================== */
 
-function applyWeatherBackground(condition) {
+function applyWeatherBackground(data) {
   if (!heroSectionEl) return;
 
+  const condition = data?.weather?.[0]?.description || "";
   const c = condition.toLowerCase();
   const themes = ["hero--clear", "hero--clouds", "hero--rain", "hero--snow", "hero--night"];
   heroSectionEl.classList.remove(...themes);
@@ -422,6 +418,42 @@ function applyWeatherBackground(condition) {
   if (c.includes("night") || c.includes("nacht")) theme = "hero--night";
 
   heroSectionEl.classList.add(theme);
+}
+
+function setAtmosphereTheme(current) {
+  if (!current) return;
+  const body = document.body;
+  if (!body) return;
+
+  const sunrise = current.sys?.sunrise;
+  const sunset = current.sys?.sunset;
+  const now = current.dt;
+
+  let isDay = true;
+  if (sunrise && sunset && now) {
+    isDay = now >= sunrise && now < sunset;
+  }
+
+  const condition = current.weather?.[0]?.description?.toLowerCase() || "";
+  const themes = ["theme-day", "theme-night", "theme-clear"];
+  body.classList.remove(...themes);
+
+  let nextTheme = isDay ? "theme-day" : "theme-night";
+  const isSunny =
+    condition.includes("sonnig") ||
+    condition.includes("klar") ||
+    condition.includes("clear");
+
+  if (isDay && isSunny) nextTheme = "theme-clear";
+  body.classList.add(nextTheme);
+
+  if (sunOrbEl) {
+    const feels = current.main?.feels_like ?? 15;
+    const bounded = Math.max(-10, Math.min(35, feels));
+    const ratio = (bounded + 10) / 45;
+    const topOffset = 15 + (1 - ratio) * 20;
+    sunOrbEl.style.top = `${topOffset}%`;
+  }
 }
 
 /* ==========================================
@@ -603,7 +635,6 @@ function renderAdvanced(data) {
   const temp = data.main.temp;
   const feels = data.main.feels_like;
   const humidity = data.main.humidity;
-  const wind = data.wind.speed;
   const clouds = data.clouds.all;
 
   const dewPoint = computeDewPoint(temp, humidity);
@@ -611,8 +642,7 @@ function renderAdvanced(data) {
   const cards = [
     { title: "Taupunkt", value: `${dewPoint.toFixed(1)}°C`, extra: dewPointExplain(dewPoint) },
     { title: "Bewölkung", value: `${clouds}%`, extra: "" },
-    { title: "Thermischer Stress", value: thermalStress(feels), extra: "" },
-    { title: "Wind Chill", value: windChillLabel(temp, wind), extra: "" }
+    { title: "Thermischer Stress", value: thermalStress(feels), extra: "" }
   ];
 
   cards.forEach((c, i) => {
@@ -628,115 +658,6 @@ function renderAdvanced(data) {
   });
 }
 
-/* ==========================================
-   CITY INSIGHTS – optional
-   ========================================== */
-
-async function renderCityInsights(lat, lon, cityName) {
-  if (!cityInsightsEl) return;
-  cityInsightsEl.innerHTML = "";
-
-  let aqiLabel = "Unbekannt";
-
-  try {
-    const aqiURL = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`;
-    const aqiRes = await fetch(aqiURL);
-    const aqiData = await aqiRes.json();
-    const aqi = aqiData?.list?.[0]?.main?.aqi ?? null;
-
-    const aqiMeaning = [
-      "Gut",
-      "Mäßig",
-      "Unangenehm",
-      "Schlecht",
-      "Gefährlich"
-    ];
-    if (aqi && aqi >= 1 && aqi <= 5) {
-      aqiLabel = aqiMeaning[aqi - 1];
-    }
-  } catch (e) {
-    console.warn("AQI konnte nicht geladen werden:", e);
-  }
-
-  const randomUv = Math.round(Math.random() * 10);
-
-  const cards = [
-    { title: "Luftqualität (AQI)", value: aqiLabel },
-    { title: "UV-Index (geschätzt)", value: randomUv },
-    { title: "Historisches Mittel", value: "Ø 14–18°C (ungefähr)" },
-    { title: "Stadt-Fakt", value: `${cityName} hat ein eigenes Mikroklima.` }
-  ];
-
-  cards.forEach((c, i) => {
-    const el = document.createElement("div");
-    el.className = "card animate-fade-in";
-    el.style.animationDelay = `${i * 120}ms`;
-    el.innerHTML = `
-      <div class="card-title">${c.title}</div>
-      <div class="card-value">${c.value}</div>
-    `;
-    cityInsightsEl.appendChild(el);
-  });
-}
-
-/* ==========================================
-   MOON PHASE
-   ========================================== */
-
-function renderMoon(current) {
-  if (!moonCardEl) return;
-
-  const now = new Date(current.dt * 1000);
-  const moon = computeMoonPhase(now);
-
-  const phaseNames = [
-    "Neumond",
-    "Zunehmende Sichel",
-    "Erstes Viertel",
-    "Zunehmender Mond",
-    "Vollmond",
-    "Abnehmender Mond",
-    "Letztes Viertel",
-    "Abnehmende Sichel"
-  ];
-
-  moonCardEl.innerHTML = `
-    <div class="moon-visual">
-      <div class="moon-shadow" style="transform: translateX(${(moon.illumination - 0.5) * 40}px);"></div>
-    </div>
-    <div>
-      <div class="card-value">${phaseNames[moon.index]}</div>
-      <div class="card-extra">${Math.round(moon.illumination * 100)}% Beleuchtung</div>
-    </div>
-  `;
-}
-
-/* ==========================================
-   WIND
-   ========================================== */
-
-function renderWindCompass(current) {
-  if (!windCardEl) return;
-
-  const speed = current.wind.speed;
-  const deg = current.wind.deg || 0;
-
-  windCardEl.innerHTML = `
-    <div class="wind-compass">
-      <div class="wind-arrow" id="wind-arrow"></div>
-      <div class="wind-center-dot"></div>
-    </div>
-    <div class="card-value">${degToDirection(deg)} (${deg}°)</div>
-    <div class="card-extra">${speed.toFixed(1)} m/s</div>
-  `;
-
-  setTimeout(() => {
-    const arrow = document.getElementById("wind-arrow");
-    if (arrow) {
-      arrow.style.transform = `translate(-50%, -80%) rotate(${deg}deg)`;
-    }
-  }, 100);
-}
 
 /* ==========================================
    RAIN WAVEFORM
@@ -910,27 +831,6 @@ function thermalStress(f) {
   if (f < 25) return "Komfortzone 🙂";
   if (f < 32) return "Wärme-Stress ☀️";
   return "Hitze-Stress 🔥";
-}
-
-function windChillLabel(t, w) {
-  if (t > 15 || w < 3) return "kaum spürbar";
-  if (w < 6) return "leicht kälter";
-  return "deutlich kälter";
-}
-
-function computeMoonPhase(date) {
-  const synodic = 29.53058867;
-  const known = new Date(Date.UTC(2000, 0, 6, 18, 14));
-  const days = (date - known) / 86400000;
-  const phase = days % synodic;
-  const index = Math.floor((phase / synodic) * 8 + 0.5) % 8;
-  const illumination = (1 - Math.cos((2 * Math.PI * phase) / synodic)) / 2;
-  return { index, illumination };
-}
-
-function degToDirection(deg) {
-  const dirs = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
-  return dirs[Math.round(deg / 45) % 8];
 }
 
 
