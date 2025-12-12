@@ -74,6 +74,7 @@ function initApp() {
 
 function showDetail() {
   if (!homeView || !detailView) return;
+  const body = document.body;
 
   homeView.style.opacity = "1";
   homeView.style.transform = "scale(1)";
@@ -95,10 +96,13 @@ function showDetail() {
 
     window.scrollTo(0, 0);
   }, 250);
+
+  if (body) body.classList.add("view-detail-active");
 }
 
 function showHome() {
   if (!homeView || !detailView) return;
+  const body = document.body;
 
   detailView.style.opacity = "1";
   detailView.style.transform = "scale(1)";
@@ -120,6 +124,8 @@ function showHome() {
 
     window.scrollTo(0, 0);
   }, 250);
+
+  if (body) body.classList.remove("view-detail-active");
 }
 
 function setupBackButton() {
@@ -346,7 +352,7 @@ async function loadWeatherByCoords(lat, lon) {
 
     renderHero(current);
     renderMetrics(current);
-    renderForecast(forecast);
+    renderForecast(current, forecast);
     renderAdvanced(current);
     renderRainWaveform(forecast);
     renderHeatStress(current);
@@ -407,15 +413,31 @@ function applyWeatherBackground(data) {
 
   const condition = data?.weather?.[0]?.description || "";
   const c = condition.toLowerCase();
-  const themes = ["hero--clear", "hero--clouds", "hero--rain", "hero--snow", "hero--night"];
+  const themes = [
+    "hero--clear",
+    "hero--clouds",
+    "hero--rain",
+    "hero--snow",
+    "hero--night"
+  ];
   heroSectionEl.classList.remove(...themes);
+
+  const sunrise = data.sys?.sunrise;
+  const sunset = data.sys?.sunset;
+  const now = data.dt;
+  const isNight = sunrise && sunset && now ? now < sunrise || now >= sunset : false;
 
   let theme = "hero--clouds";
 
-  if (c.includes("clear") || c.includes("sonnig")) theme = "hero--clear";
-  if (c.includes("rain") || c.includes("regen") || c.includes("drizzle") || c.includes("thunder")) theme = "hero--rain";
-  if (c.includes("snow") || c.includes("schnee")) theme = "hero--snow";
-  if (c.includes("night") || c.includes("nacht")) theme = "hero--night";
+  if (isNight) {
+    theme = "hero--night";
+  } else if (c.includes("clear") || c.includes("sonnig")) {
+    theme = "hero--clear";
+  } else if (c.includes("rain") || c.includes("regen") || c.includes("drizzle") || c.includes("thunder")) {
+    theme = "hero--rain";
+  } else if (c.includes("snow") || c.includes("schnee")) {
+    theme = "hero--snow";
+  }
 
   heroSectionEl.classList.add(theme);
 }
@@ -500,22 +522,25 @@ function renderMetrics(data) {
    FORECAST + MOMENTUM SCROLL
    ========================================== */
 
-function renderForecast(forecast) {
+function renderForecast(currentData, forecast) {
   if (!forecastTrackEl) return;
   forecastTrackEl.innerHTML = "";
 
-  const list = forecast.list.slice(0, 8);
+  const list = forecast?.list || [];
+  const hourly = buildHourlyForecast(currentData, list, 12);
+  if (!hourly.length) return;
 
-  list.forEach((item, i) => {
+  hourly.forEach((item, i) => {
     const dt = new Date(item.dt * 1000);
-    const temp = Math.round(item.main.temp);
-    const cond = item.weather[0].main;
+    const temp = Math.round(item.temp);
+    const cond = item.weatherMain;
+    const label = i === 0 ? "Jetzt" : formatHourLabel(dt);
 
     const el = document.createElement("div");
     el.className = "forecast-card animate-fade-in";
     el.style.animationDelay = `${i * 80}ms`;
     el.innerHTML = `
-      <div class="forecast-time">${formatHour(dt)}</div>
+      <div class="forecast-time">${label}</div>
       <div class="forecast-icon">${conditionToEmoji(cond)}</div>
       <div class="forecast-temp">${temp}°</div>
     `;
@@ -797,8 +822,66 @@ function formatTime(d) {
   return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatHour(d) {
-  return d.toLocaleTimeString("de-DE", { hour: "2-digit" });
+function formatHourLabel(d) {
+  const hour = d.getHours().toString().padStart(2, "0");
+  return `${hour} Uhr`;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function buildHourlyForecast(currentData, list, hours = 12) {
+  if (!currentData) return [];
+
+  const segments = [
+    {
+      dt: currentData.dt,
+      main: { temp: currentData.main?.temp ?? currentData.main?.feels_like ?? 0 },
+      weather: currentData.weather
+    }
+  ];
+
+  if (Array.isArray(list) && list.length) {
+    segments.push(...list);
+  }
+
+  segments.sort((a, b) => a.dt - b.dt);
+
+  const baseTime = currentData.dt;
+  const hourly = [];
+  let segmentIndex = 0;
+
+  for (let i = 0; i < hours; i++) {
+    const targetDt = baseTime + i * 3600;
+
+    while (
+      segmentIndex < segments.length - 1 &&
+      segments[segmentIndex + 1].dt < targetDt
+    ) {
+      segmentIndex++;
+    }
+
+    const prev = segments[segmentIndex];
+    const next = segments[segmentIndex + 1] || prev;
+    const prevTemp = prev.main?.temp ?? prev.main?.feels_like ?? 0;
+    const nextTemp = next.main?.temp ?? next.main?.feels_like ?? prevTemp;
+    const span = next.dt - prev.dt || 1;
+    const ratio = Math.min(1, Math.max(0, (targetDt - prev.dt) / span));
+
+    const temp = lerp(prevTemp, nextTemp, ratio);
+    const weatherSource = ratio < 0.5 ? prev : next;
+    const weather = weatherSource.weather?.[0] || prev.weather?.[0] || {};
+
+    hourly.push({
+      dt: targetDt,
+      temp,
+      weatherMain: weather.main || "",
+      weatherDesc: weather.description || ""
+    });
+  }
+
+  return hourly;
 }
 
 function conditionToEmoji(c) {
@@ -832,5 +915,3 @@ function thermalStress(f) {
   if (f < 32) return "Wärme-Stress ☀️";
   return "Hitze-Stress 🔥";
 }
-
-
