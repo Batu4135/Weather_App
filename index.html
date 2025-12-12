@@ -15,7 +15,13 @@
   <link rel="icon" href="icon.png" />
   <link rel="apple-touch-icon" href="icon.png" />
 </head>
-<body>
+<body class="theme-night">
+
+  <div id="ambient-layer" class="ambient-layer" aria-hidden="true">
+    <div class="ambient-shape ambient-shape--one"></div>
+    <div class="ambient-shape ambient-shape--two"></div>
+    <div id="sun-orb" class="sun-orb"></div>
+  </div>
 
   <!-- Splash Screen -->
  <div id="splash" class="splash-screen">
@@ -121,15 +127,6 @@
         <div id="advanced-grid" class="advanced-grid"></div>
       </section>
 
-      <!-- COSMIC / WIND -->
-      <section class="section">
-        <h2 class="section-title">Cosmic & Dynamics</h2>
-        <div class="metrics-grid">
-          <div id="moon-card" class="card"></div>
-          <div id="wind-card" class="card"></div>
-        </div>
-      </section>
-
       <!-- REGEN & HEAT -->
       <section class="section">
         <h2 class="section-title">Rain & Comfort</h2>
@@ -166,3 +163,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
