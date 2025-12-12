@@ -1,917 +1,877 @@
-/* ==========================================
-   Wetter SPA – iOS Modern Animated Version
-   ========================================== */
+/* ===========================================
+   GLOBAL iOS DESIGN
+   =========================================== */
 
-const API_KEY = "83bcc8dbea48e891fc4cb6cd868ad732";
-const UNITS = "metric";
-const LANG = "de";
+:root {
+  --bg-main: #f3f4f7;
+  --bg-card: rgba(255, 255, 255, 0.55);
+  --text-main: #111;
+  --text-muted: #666;
 
-/* DOM: Views */
-const homeView = document.getElementById("home-view");
-const detailView = document.getElementById("detail-view");
-const backButton = document.getElementById("back-button");
+  --radius-lg: 26px;
+  --radius-md: 20px;
 
-/* DOM: Detail – Hero */
-const heroSectionEl = document.getElementById("hero");
-const heroTempEl = document.getElementById("hero-temp");
-const heroCityEl = document.getElementById("hero-city");
-const heroCondEl = document.getElementById("hero-condition");
-const heroMetaEl = document.getElementById("hero-meta");
-
-/* DOM: Detail – Sections */
-const metricsGridEl = document.getElementById("metrics-grid");
-const forecastTrackEl = document.getElementById("forecast-track");
-const advancedGridEl = document.getElementById("advanced-grid");
-
-const rainCanvasEl = document.getElementById("rain-canvas");
-const rainCaptionEl = document.getElementById("rain-caption");
-
-const heatMarkerEl = document.getElementById("heat-marker");
-const heatCaptionEl = document.getElementById("heat-caption");
-const sunOrbEl = document.getElementById("sun-orb");
-
-/* DOM: Home */
-const cityCardsEl = document.getElementById("city-card-list");
-
-/* Suche */
-const cityInput = document.getElementById("city-search");
-const cityResults = document.getElementById("city-results");
-const searchBtn = document.querySelector(".search-icon-btn");
-
-/* Splash */
-const splashEl = document.getElementById("splash");
-
-/* STATE */
-let recentCities = [];
-let forecastDragInitialized = false;
-
-/* ==========================================
-   INIT
-   ========================================== */
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Splash animiert ausblenden
-  if (splashEl) {
-    setTimeout(() => splashEl.classList.add("splash--hide"), 600);
-    setTimeout(() => splashEl.remove(), 1300);
-  }
-});
-
-initApp();
-
-function initApp() {
-  loadRecentFromStorage();
-  renderRecentCards();
-  setupSearch();
-  setupBackButton();
-  setupGeolocationCard();
-  initHeroParallax();
+  --shadow-soft: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
-/* ==========================================
-   VIEW SWITCHING + SANFTE TRANSITION
-   ========================================== */
-
-function showDetail() {
-  if (!homeView || !detailView) return;
-  const body = document.body;
-
-  homeView.style.opacity = "1";
-  homeView.style.transform = "scale(1)";
-  requestAnimationFrame(() => {
-    homeView.style.opacity = "0";
-    homeView.style.transform = "scale(0.94)";
-  });
-
-  setTimeout(() => {
-    homeView.classList.remove("view--active");
-    detailView.classList.add("view--active");
-
-    detailView.style.opacity = "0";
-    detailView.style.transform = "scale(1.04)";
-    requestAnimationFrame(() => {
-      detailView.style.opacity = "1";
-      detailView.style.transform = "scale(1)";
-    });
-
-    window.scrollTo(0, 0);
-  }, 250);
-
-  if (body) body.classList.add("view-detail-active");
+* {
+  box-sizing: border-box;
 }
 
-function showHome() {
-  if (!homeView || !detailView) return;
-  const body = document.body;
-
-  detailView.style.opacity = "1";
-  detailView.style.transform = "scale(1)";
-  requestAnimationFrame(() => {
-    detailView.style.opacity = "0";
-    detailView.style.transform = "scale(1.04)";
-  });
-
-  setTimeout(() => {
-    detailView.classList.remove("view--active");
-    homeView.classList.add("view--active");
-
-    homeView.style.opacity = "0";
-    homeView.style.transform = "scale(0.94)";
-    requestAnimationFrame(() => {
-      homeView.style.opacity = "1";
-      homeView.style.transform = "scale(1)";
-    });
-
-    window.scrollTo(0, 0);
-  }, 250);
-
-  if (body) body.classList.remove("view-detail-active");
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #0b1224, #04070f);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  color: var(--text-main);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+  transition: background 0.8s ease;
+  position: relative;
+  overflow-x: hidden;
 }
 
-function setupBackButton() {
-  if (!backButton) return;
-  backButton.addEventListener("click", showHome);
+body.theme-night {
+  background:
+    radial-gradient(circle at top, rgba(5, 8, 20, 0.75), rgba(1, 1, 4, 0.95)),
+    url("assets/img/StarSky.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
-/* ==========================================
-   HERO PARALLAX
-   ========================================== */
-
-function initHeroParallax() {
-  if (!heroSectionEl) return;
-
-  heroSectionEl.addEventListener("pointermove", (e) => {
-    const rect = heroSectionEl.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width - 0.5;
-    const y = (e.clientY - rect.top) / rect.height - 0.5;
-    const translateY = -y * 6;
-    heroSectionEl.style.transform = `translateY(${translateY}px)`;
-  });
-
-  heroSectionEl.addEventListener("pointerleave", () => {
-    heroSectionEl.style.transform = "";
-  });
+body.theme-day {
+  background: radial-gradient(circle at top, #e0f2ff, #a5c9ff 60%, #7ba7ff);
 }
 
-/* ==========================================
-   STORAGE FOR RECENT CITIES
-   ========================================== */
-
-function loadRecentFromStorage() {
-  try {
-    recentCities = JSON.parse(localStorage.getItem("recentCities")) || [];
-  } catch {
-    recentCities = [];
-  }
+body.theme-clear {
+  background: radial-gradient(circle at top, #fef7e1, #ffe0b2 55%, #f4b38a);
 }
 
-function saveRecents() {
-  localStorage.setItem("recentCities", JSON.stringify(recentCities));
+/* ===========================================
+   AMBIENT LOW-POLY BACKDROP
+   =========================================== */
+
+.ambient-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  filter: drop-shadow(0 40px 100px rgba(0,0,0,0.35));
 }
 
-function upsertRecentCity(city) {
-  const isLocation = city.id === "location";
-
-  // Wenn Standort: immer an Position 0 setzen
-  if (isLocation) {
-    // Entferne alte Standortkarte (falls vorhanden)
-    recentCities = recentCities.filter((c) => c.id !== "location");
-
-    // Standort VORNE einfügen
-    recentCities.unshift(city);
-
-    saveRecents();
-    renderRecentCards();
-    return;
-  }
-
-  // Prüfen ob diese Stadt dieselben Koordinaten wie der Standort hat
-  const loc = recentCities.find((c) => c.id === "location");
-  if (
-    loc &&
-    Math.abs(loc.lat - city.lat) < 0.01 &&
-    Math.abs(loc.lon - city.lon) < 0.01
-  ) {
-    // dieselbe Stadt wie Standort → NICHT speichern
-    return;
-  }
-
-  // Normale Städte entfernen
-  recentCities = recentCities.filter((c) => c.id !== city.id);
-
-  // Wenn Standort vorhanden → Stadt hinter Standort einfügen
-  if (loc) {
-    recentCities.splice(1, 0, city);
-  } else {
-    recentCities.unshift(city);
-  }
-
-  // Begrenzen
-  if (recentCities.length > 10) recentCities.length = 10;
-
-  saveRecents();
-  renderRecentCards();
+.ambient-layer {
+  display: none;
 }
 
-/* ==========================================
-   GEOLOCATION CARD CREATION
-   ========================================== */
-
-function setupGeolocationCard() {
-  if (!navigator.geolocation) return;
-
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    try {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-
-      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      const city = {
-        id: "location", // feste ID für Standort
-        name: data.name || "Mein Standort",
-        country: data.sys?.country || "",
-        lat,
-        lon,
-        temp: Math.round(data.main.temp),
-        isLocation: true
-      };
-
-      upsertRecentCity(city);
-    } catch (e) {
-      console.warn("Fehler bei Geolokalisierung:", e);
-    }
-  });
+.ambient-shape {
+  position: absolute;
+  width: 70vw;
+  height: 70vw;
+  opacity: 0.45;
+  filter: blur(0.5px);
+  transform: rotate(12deg) scale(1.1);
+  transition: background 0.8s ease;
+  background: linear-gradient(135deg, rgba(56,189,248,0.65), rgba(14,116,144,0.85));
+  clip-path: polygon(15% 0, 100% 15%, 90% 70%, 55% 100%, 0 80%, 0 25%);
 }
 
-/* ==========================================
-   RENDER RECENT CITY CARDS
-   ========================================== */
-
-function renderRecentCards() {
-  if (!cityCardsEl) return;
-  cityCardsEl.innerHTML = "";
-
-  if (!recentCities.length) {
-    const info = document.createElement("div");
-    info.textContent = "Noch keine Städte.";
-    info.style.fontSize = "0.9rem";
-    info.style.color = "#777";
-    cityCardsEl.appendChild(info);
-    return;
-  }
-
-  recentCities.forEach((c, index) => {
-    const theme =
-      c.temp >= 25 ? "warm" :
-      c.temp <= 5  ? "cold" :
-      "neutral";
-
-    const card = document.createElement("div");
-    card.className = `city-card city-card--${theme} animate-fade-in`;
-    card.style.animationDelay = `${index * 80}ms`;
-
-    const label = c.isLocation
-      ? "Mein Standort"
-      : (index === 0 ? "Zuletzt" : "Gespeichert");
-
-    const subtitle = c.isLocation
-      ? `${c.country || "Standort"} · Zum Anzeigen tippen`
-      : `${c.country} · Zum Anzeigen tippen`;
-
-    card.innerHTML = `
-      <div class="city-card-top">
-        <div class="city-card-chip">${label}</div>
-        <div class="city-card-temp">${c.temp}°</div>
-      </div>
-
-      ${!c.isLocation ? `<div class="city-card-delete">🗑️</div>` : ""}
-
-      <div class="city-card-bottom-title">${c.name}</div>
-      <div class="city-card-bottom-sub">${subtitle}</div>
-    `;
-
-    // Card öffnen
-    card.addEventListener("click", () => openCityDetail(c));
-
-    // Lösch-Icon (nur wenn nicht Standort)
-    if (!c.isLocation) {
-      const delBtn = card.querySelector(".city-card-delete");
-      if (delBtn) {
-        delBtn.addEventListener("click", (e) => {
-          e.stopPropagation(); // verhindert, dass die Card geöffnet wird
-          deleteCity(c.id);
-        });
-      }
-    }
-
-    cityCardsEl.appendChild(card);
-  });
+.ambient-shape--one {
+  top: -20%;
+  left: -20%;
 }
 
-function deleteCity(id) {
-  // Standort kann nicht gelöscht werden
-  if (id === "location") return;
-  recentCities = recentCities.filter((c) => c.id !== id);
-  saveRecents();
-  renderRecentCards();
+.ambient-shape--two {
+  bottom: -35%;
+  right: -30%;
+  clip-path: polygon(0 20%, 55% 0, 100% 35%, 80% 90%, 30% 100%, 0 70%);
+  background: linear-gradient(145deg, rgba(59,130,246,0.7), rgba(8,47,73,0.9));
 }
 
-/* ==========================================
-   OPEN DETAIL VIEW
-   ========================================== */
-
-async function openCityDetail(city) {
-  await loadWeatherByCoords(city.lat, city.lon);
+body.theme-day .ambient-shape--one {
+  background: linear-gradient(135deg, rgba(250,204,21,0.6), rgba(248,113,113,0.7));
 }
 
-/* ==========================================
-   LOAD WEATHER DATA
-   ========================================== */
-
-async function loadWeatherByCoords(lat, lon) {
-  try {
-    const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
-    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
-
-    const [currentRes, forecastRes] = await Promise.all([
-      fetch(currentUrl),
-      fetch(forecastUrl)
-    ]);
-
-    const current = await currentRes.json();
-    const forecast = await forecastRes.json();
-
-    const cityName = current.name;
-    const country = current.sys?.country || "";
-    const temp = Math.round(current.main.temp);
-
-    if (heroCityEl) heroCityEl.textContent = cityName;
-
-    renderHero(current);
-    renderMetrics(current);
-    renderForecast(current, forecast);
-    renderAdvanced(current);
-    renderRainWaveform(forecast);
-    renderHeatStress(current);
-
-    applyWeatherBackground(current);
-    setAtmosphereTheme(current);
-
-    upsertRecentCity({
-      id: `${cityName}-${country}`,
-      name: cityName,
-      country,
-      lat,
-      lon,
-      temp
-    });
-
-    showDetail();
-  } catch (err) {
-    console.error(err);
-    if (heroCondEl) heroCondEl.textContent = "Fehler beim Laden.";
-  }
+body.theme-day .ambient-shape--two {
+  background: linear-gradient(145deg, rgba(125,211,252,0.6), rgba(59,130,246,0.65));
 }
 
-/* ==========================================
-   HERO RENDER + TEMPERATURE ANIMATION
-   ========================================== */
-
-function renderHero(data) {
-  if (!heroTempEl || !heroCondEl || !heroMetaEl) return;
-
-  const temp = Math.round(data.main.temp);
-  const feels = Math.round(data.main.feels_like);
-  const cond = data.weather[0].description;
-  const wind = data.wind.speed;
-  const humidity = data.main.humidity;
-
-  heroTempEl.style.opacity = "0";
-  setTimeout(() => {
-    heroTempEl.textContent = `${temp}°C`;
-    heroTempEl.style.transform = "scale(1.1)";
-    heroTempEl.style.opacity = "1";
-    setTimeout(() => {
-      heroTempEl.style.transform = "scale(1)";
-    }, 180);
-  }, 120);
-
-  const condPretty = cond.charAt(0).toUpperCase() + cond.slice(1);
-  heroCondEl.textContent = condPretty;
-  heroMetaEl.textContent = `Gefühlt ${feels}° • Wind ${wind} m/s • Luftfeuchte ${humidity}%`;
+body.theme-clear .ambient-shape--one {
+  background: linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,186,8,0.65));
 }
 
-/* ==========================================
-   DYNAMIC WEATHER BACKGROUND
-   ========================================== */
-
-function applyWeatherBackground(data) {
-  if (!heroSectionEl) return;
-
-  const condition = data?.weather?.[0]?.description || "";
-  const c = condition.toLowerCase();
-  const themes = [
-    "hero--clear",
-    "hero--clouds",
-    "hero--rain",
-    "hero--snow",
-    "hero--night"
-  ];
-  heroSectionEl.classList.remove(...themes);
-
-  const sunrise = data.sys?.sunrise;
-  const sunset = data.sys?.sunset;
-  const now = data.dt;
-  const isNight = sunrise && sunset && now ? now < sunrise || now >= sunset : false;
-
-  let theme = "hero--clouds";
-
-  if (isNight) {
-    theme = "hero--night";
-  } else if (c.includes("clear") || c.includes("sonnig")) {
-    theme = "hero--clear";
-  } else if (c.includes("rain") || c.includes("regen") || c.includes("drizzle") || c.includes("thunder")) {
-    theme = "hero--rain";
-  } else if (c.includes("snow") || c.includes("schnee")) {
-    theme = "hero--snow";
-  }
-
-  heroSectionEl.classList.add(theme);
+body.theme-clear .ambient-shape--two {
+  background: linear-gradient(145deg, rgba(252,211,77,0.6), rgba(248,113,113,0.6));
 }
 
-function setAtmosphereTheme(current) {
-  if (!current) return;
-  const body = document.body;
-  if (!body) return;
-
-  const sunrise = current.sys?.sunrise;
-  const sunset = current.sys?.sunset;
-  const now = current.dt;
-
-  let isDay = true;
-  if (sunrise && sunset && now) {
-    isDay = now >= sunrise && now < sunset;
-  }
-
-  const condition = current.weather?.[0]?.description?.toLowerCase() || "";
-  const themes = ["theme-day", "theme-night", "theme-clear"];
-  body.classList.remove(...themes);
-
-  let nextTheme = isDay ? "theme-day" : "theme-night";
-  const isSunny =
-    condition.includes("sonnig") ||
-    condition.includes("klar") ||
-    condition.includes("clear");
-
-  if (isDay && isSunny) nextTheme = "theme-clear";
-  body.classList.add(nextTheme);
-
-  if (sunOrbEl) {
-    const feels = current.main?.feels_like ?? 15;
-    const bounded = Math.max(-10, Math.min(35, feels));
-    const ratio = (bounded + 10) / 45;
-    const topOffset = 15 + (1 - ratio) * 20;
-    sunOrbEl.style.top = `${topOffset}%`;
-  }
+.sun-orb {
+  position: absolute;
+  top: 20%;
+  right: 12%;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7d6 0%, #ffd166 45%, #f97316 65%);
+  box-shadow: 0 0 60px rgba(250,204,21,0.7);
+  opacity: 0;
+  transform: scale(0.65);
+  transition: opacity 0.5s ease, transform 0.6s ease;
+  animation: sunFloat 10s ease-in-out infinite alternate;
 }
 
-/* ==========================================
-   METRIC CARDS
-   ========================================== */
-
-function renderMetrics(data) {
-  if (!metricsGridEl) return;
-  metricsGridEl.innerHTML = "";
-
-  const feels = Math.round(data.main.feels_like);
-  const humidity = data.main.humidity;
-  const pressure = data.main.pressure;
-  const visibilityKm = (data.visibility / 1000).toFixed(1);
-  const wind = data.wind.speed;
-
-  const sunrise = new Date(data.sys.sunrise * 1000);
-  const sunset = new Date(data.sys.sunset * 1000);
-  const daylightHours = ((sunset - sunrise) / 3600000).toFixed(1);
-
-  const cards = [
-    { title: "Gefühlte Temp.", value: `${feels}°C`, extra: "" },
-    { title: "Wind", value: `${wind} m/s`, extra: "" },
-    { title: "Luftfeuchte", value: `${humidity}%`, extra: "" },
-    { title: "Sichtweite", value: `${visibilityKm} km`, extra: "" },
-    { title: "Luftdruck", value: `${pressure} hPa`, extra: "" },
-    { title: "Tageslänge", value: `${daylightHours} h`, extra: `${formatTime(sunrise)} – ${formatTime(sunset)}` }
-  ];
-
-  cards.forEach((c, i) => {
-    const card = document.createElement("div");
-    card.className = "card animate-fade-in";
-    card.style.animationDelay = `${i * 70}ms`;
-    card.innerHTML = `
-      <div class="card-title">${c.title}</div>
-      <div class="card-value">${c.value}</div>
-      <div class="card-extra">${c.extra}</div>
-    `;
-    metricsGridEl.appendChild(card);
-  });
+body.theme-clear .sun-orb {
+  opacity: 1;
+  transform: scale(1);
 }
 
-/* ==========================================
-   FORECAST + MOMENTUM SCROLL
-   ========================================== */
+@keyframes sunFloat {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(20px, -10px, 0) scale(1.05); }
+}
 
-function renderForecast(currentData, forecast) {
-  if (!forecastTrackEl) return;
-  forecastTrackEl.innerHTML = "";
+/* iPhone Screen Frame */
+.page {
+  max-width: 480px;
+  width: 100%;
+  background: linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,255,255,0.55));
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow:
+    0 24px 55px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.6);
+  padding: 22px 18px 30px;
+  border-radius: 32px;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
 
-  const list = forecast?.list || [];
-  const hourly = buildHourlyForecast(currentData, list, 12);
-  if (!hourly.length) return;
+/* iPhone Notch Bar */
+.page::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.15);
+}
 
-  hourly.forEach((item, i) => {
-    const dt = new Date(item.dt * 1000);
-    const temp = Math.round(item.temp);
-    const cond = item.weatherMain;
-    const label = i === 0 ? "Jetzt" : formatHourLabel(dt);
+body.view-detail-active .page {
+  background: linear-gradient(145deg, rgba(255,255,255,0.72), rgba(255,255,255,0.4));
+  backdrop-filter: blur(32px) saturate(190%);
+}
 
-    const el = document.createElement("div");
-    el.className = "forecast-card animate-fade-in";
-    el.style.animationDelay = `${i * 80}ms`;
-    el.innerHTML = `
-      <div class="forecast-time">${label}</div>
-      <div class="forecast-icon">${conditionToEmoji(cond)}</div>
-      <div class="forecast-temp">${temp}°</div>
-    `;
-    forecastTrackEl.appendChild(el);
-  });
+body.theme-night.view-detail-active .page {
+  background: linear-gradient(160deg, rgba(4, 7, 15, 0.6), rgba(1, 3, 9, 0.78));
+  color: #f1f5f9;
+}
 
-  if (!forecastDragInitialized) {
-    initForecastDragWithMomentum();
-    forecastDragInitialized = true;
+body.theme-night.view-detail-active .section-title {
+  color: #e2e8f0;
+}
+
+/* ===========================================
+   VIEWS
+   =========================================== */
+
+.view {
+  display: none;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: 0.35s ease;
+}
+
+.view.view--active {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===========================================
+   HOME HEADER
+   =========================================== */
+
+.home-header {
+  margin-bottom: 24px;
+  padding-top: 8px;
+}
+
+.home-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.home-hello {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+
+.home-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+}
+
+.home-avatar {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: white;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.35);
+}
+
+/* ===========================================
+   SEARCHBAR (Spotlight Style)
+   =========================================== */
+
+.search-bar {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 999px;
+  box-shadow:
+    0 10px 30px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(148, 163, 184, 0.3);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.city-search-input {
+  border: none;
+  outline: none;
+  flex: 1;
+  font-size: 1rem;
+  background: transparent;
+  color: var(--text-main);
+}
+
+.city-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.search-icon-btn {
+  background: #111827;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.search-icon-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.35);
+}
+
+/* Dropdown results */
+.city-results {
+  margin-top: 10px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 20px;
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-soft);
+  display: none;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.city-result-item {
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.city-result-item:hover {
+  background: rgba(230, 230, 240, 0.65);
+}
+
+/* ======================================================
+   CITY CARDS — NEW iOS FULLSCREEN + PEEK NEXT CARD
+   ====================================================== */
+
+.city-card-row {
+  display: flex;
+  overflow-x: auto;
+  padding-left: 16px;
+  padding-bottom: 20px;
+  gap: 0;
+  scroll-snap-type: x mandatory;
+}
+
+.city-card-row::-webkit-scrollbar {
+  display: none;
+}
+
+.city-card {
+  flex: 0 0 85%;
+  max-width: 85%;
+
+  height: calc(100vh - 320px);   
+  max-height: 480px;
+
+  border-radius: 28px;
+  padding: 22px;
+  color: white;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  background: linear-gradient(145deg, #3c8aff, #4c42ff);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  backdrop-filter: blur(16px);
+
+  scroll-snap-align: start;
+  margin-right: 40px;
+
+  transition: transform 0.3s ease;
+}
+
+.city-card-bottom-title {
+  margin-top: auto;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.city-card-bottom-sub {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+/* ===========================================
+   BACK BUTTON
+   =========================================== */
+
+.back-button {
+  border: none;
+  padding: 10px 18px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+  font-size: 1rem;
+  margin-bottom: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+/* ===========================================
+   HERO SECTION (unchanged)
+   =========================================== */
+
+.hero {
+  background: linear-gradient(180deg, #6ab0ff, #8b7dff);
+  border-radius: 0 0 30px 30px;
+  padding: 40px 20px 60px;
+  margin: 0 -16px 24px -16px;
+  text-align: center;
+  color: white;
+  will-change: transform;
+  transition: transform 0.4s cubic-bezier(.16,1,.3,1), background 0.8s ease;
+}
+
+.hero-temp {
+  font-size: 4.6rem;
+  font-weight: 700;
+}
+
+.hero-city {
+  margin-top: 6px;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.hero-condition {
+  margin-top: 8px;
+}
+
+.hero-meta {
+  margin-top: 12px;
+}
+
+/* ===========================================
+   DYNAMIC ISLAND (unchanged)
+   =========================================== */
+
+.dynamic-island {
+  position: relative;
+  margin: 0 auto 18px auto;
+  width: 92%;
+  background: rgba(255,255,255,0.35);
+  backdrop-filter: blur(20px) saturate(150%);
+  border-radius: 22px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  cursor: pointer;
+  overflow: hidden;
+  transition: height 0.35s ease, padding 0.35s ease;
+}
+
+/* ---- BEHALTE ALLES WEITERE SO WIE ES IST ---- */
+
+/* ===========================================
+   DETAIL SCREEN CARD DESIGN
+   =========================================== */
+
+.section {
+  margin-bottom: 28px;
+}
+
+.section-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #222;
+  letter-spacing: -0.02em;
+}
+
+/* Glass-Style Cards */
+.card {
+  padding: 18px 20px;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(18px) saturate(180%);
+  border-radius: 22px;
+  margin-bottom: 16px;
+  box-shadow:
+    0 8px 25px rgba(0,0,0,0.06),
+    inset 0 0 6px rgba(255,255,255,0.25);
+  animation: cardPop 0.7s cubic-bezier(.22,.61,.36,1) forwards;
+}
+
+body.theme-night.view-detail-active .card {
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  box-shadow:
+    0 10px 30px rgba(0,0,0,0.35),
+    inset 0 0 10px rgba(15, 23, 42, 0.6);
+}
+
+.card-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+.card-value {
+  margin-top: 6px;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.card-extra {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+body.theme-night.view-detail-active .card-title,
+body.theme-night.view-detail-active .card-extra {
+  color: rgba(226, 232, 240, 0.85);
+}
+
+/* Metrics grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 14px;
+}
+
+@media (min-width: 420px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* DRAG SCROLL WITH MOMENTUM (Desktop + Mobile) */
-function initForecastDragWithMomentum() {
-  if (!forecastTrackEl) return;
-
-  let isDown = false;
-  let startX = 0;
-  let scrollLeft = 0;
-  let lastX = 0;
-  let lastTime = 0;
-  let velocity = 0;
-  let momentumFrame = null;
-
-  const friction = 0.95;
-  const minVelocity = 0.05;
-
-  function stopMomentum() {
-    if (momentumFrame !== null) {
-      cancelAnimationFrame(momentumFrame);
-      momentumFrame = null;
-    }
-  }
-
-  function momentumLoop() {
-    if (!forecastTrackEl) return;
-    forecastTrackEl.scrollLeft -= velocity;
-    velocity *= friction;
-
-    if (Math.abs(velocity) > minVelocity) {
-      momentumFrame = requestAnimationFrame(momentumLoop);
-    } else {
-      stopMomentum();
-    }
-  }
-
-  function pointerDown(pageX) {
-    isDown = true;
-    startX = pageX;
-    scrollLeft = forecastTrackEl.scrollLeft;
-    lastX = pageX;
-    lastTime = performance.now();
-    velocity = 0;
-    stopMomentum();
-  }
-
-  function pointerMove(pageX) {
-    if (!isDown) return;
-    const x = pageX - startX;
-    forecastTrackEl.scrollLeft = scrollLeft - x;
-
-    const now = performance.now();
-    const dx = pageX - lastX;
-    const dt = now - lastTime || 1;
-    velocity = (dx / dt) * 10;
-    lastX = pageX;
-    lastTime = now;
-  }
-
-  function pointerUp() {
-    if (!isDown) return;
-    isDown = false;
-    if (Math.abs(velocity) > minVelocity) {
-      momentumLoop();
-    }
-  }
-
-  // Desktop
-  forecastTrackEl.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    pointerDown(e.pageX);
-  });
-
-  window.addEventListener("mousemove", (e) => {
-    if (!isDown) return;
-    pointerMove(e.pageX);
-  });
-
-  window.addEventListener("mouseup", () => {
-    pointerUp();
-  });
-
-  // Mobile
-  forecastTrackEl.addEventListener("touchstart", (e) => {
-    if (!e.touches || !e.touches.length) return;
-    pointerDown(e.touches[0].pageX);
-  }, { passive: true });
-
-  forecastTrackEl.addEventListener("touchmove", (e) => {
-    if (!e.touches || !e.touches.length) return;
-    pointerMove(e.touches[0].pageX);
-  }, { passive: true });
-
-  forecastTrackEl.addEventListener("touchend", () => {
-    pointerUp();
-  });
+/* Forecast horizontal strip */
+.forecast-strip {
+  padding: 14px;
+  background: linear-gradient(145deg, rgba(14,22,42,0.88), rgba(5,10,24,0.75));
+  color: #f1f5f9;
+  backdrop-filter: blur(14px) saturate(180%);
+  border-radius: 20px;
+  border: 1px solid rgba(148,163,184,0.15);
+  box-shadow:
+    0 18px 35px rgba(2,6,23,0.45),
+    inset 0 0 8px rgba(15,23,42,0.6);
 }
 
-/* ==========================================
-   ADVANCED DATA
-   ========================================== */
-
-function renderAdvanced(data) {
-  if (!advancedGridEl) return;
-  advancedGridEl.innerHTML = "";
-
-  const temp = data.main.temp;
-  const feels = data.main.feels_like;
-  const humidity = data.main.humidity;
-  const clouds = data.clouds.all;
-
-  const dewPoint = computeDewPoint(temp, humidity);
-
-  const cards = [
-    { title: "Taupunkt", value: `${dewPoint.toFixed(1)}°C`, extra: dewPointExplain(dewPoint) },
-    { title: "Bewölkung", value: `${clouds}%`, extra: "" },
-    { title: "Thermischer Stress", value: thermalStress(feels), extra: "" }
-  ];
-
-  cards.forEach((c, i) => {
-    const el = document.createElement("div");
-    el.className = "card animate-fade-in";
-    el.style.animationDelay = `${i * 80}ms`;
-    el.innerHTML = `
-      <div class="card-title">${c.title}</div>
-      <div class="card-value">${c.value}</div>
-      <div class="card-extra">${c.extra}</div>
-    `;
-    advancedGridEl.appendChild(el);
-  });
+body.theme-day .forecast-strip,
+body.theme-clear .forecast-strip {
+  background: rgba(255,255,255,0.65);
+  color: #0f172a;
+  border-color: rgba(255,255,255,0.4);
+  box-shadow: var(--shadow-soft);
 }
 
-
-/* ==========================================
-   RAIN WAVEFORM
-   ========================================== */
-
-function renderRainWaveform(forecast) {
-  if (!rainCanvasEl || !rainCaptionEl) return;
-
-  const canvas = rainCanvasEl;
-  const caption = rainCaptionEl;
-  const ctx = canvas.getContext("2d");
-
-  canvas.width = canvas.offsetWidth * 2;
-  canvas.height = canvas.offsetHeight * 2;
-  ctx.scale(2, 2);
-
-  const w = canvas.offsetWidth;
-  const h = canvas.offsetHeight;
-
-  const data = forecast.list.slice(0, 12).map((i) => i.pop || 0);
-  const max = Math.max(...data, 0.01);
-
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.strokeStyle = "#bbb";
-  ctx.beginPath();
-  ctx.moveTo(0, h - 18);
-  ctx.lineTo(w, h - 18);
-  ctx.stroke();
-
-  ctx.beginPath();
-  data.forEach((p, i) => {
-    const x = (i / (data.length - 1)) * (w - 20) + 10;
-    const y = h - 18 - (p / max) * (h - 35);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#111";
-  ctx.stroke();
-
-  const avg = Math.round((data.reduce((a, b) => a + b, 0) / data.length) * 100);
-  caption.textContent = `Durchschnittliche Regenwahrscheinlichkeit: ${avg}%`;
+.forecast-track {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+  cursor: grab;
 }
 
-/* ==========================================
-   HEAT STRESS
-   ========================================== */
-
-function renderHeatStress(current) {
-  if (!heatMarkerEl || !heatCaptionEl) return;
-
-  const feels = current.main.feels_like;
-  const min = -10, max = 40;
-  const t = (Math.max(min, Math.min(max, feels)) - min) / (max - min);
-
-  heatMarkerEl.style.left = `${t * 100}%`;
-  heatCaptionEl.textContent = `${thermalStress(feels)} · gefühlt ${Math.round(feels)}°C`;
+.forecast-card {
+  min-width: 70px;
+  text-align: center;
+  background: rgba(255,255,255,0.35);
+  border-radius: 16px;
+  padding: 8px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
 }
 
-/* ==========================================
-   SEARCH
-   ========================================== */
-
-const LOCAL_CITIES = [
-  { name: "Berlin", country: "DE" },
-  { name: "Hamburg", country: "DE" },
-  { name: "München", country: "DE" },
-  { name: "Frankfurt", country: "DE" },
-  { name: "Düsseldorf", country: "DE" },
-  { name: "Istanbul", country: "TR" },
-  { name: "Ankara", country: "TR" },
-  { name: "Izmir", country: "TR" },
-  { name: "Antalya", country: "TR" }
-];
-
-const FLAGS = {
-  DE: "🇩🇪",
-  TR: "🇹🇷"
-};
-
-function setupSearch() {
-  if (!cityInput) return;
-
-  cityInput.addEventListener("input", onSearchInput);
-
-  if (searchBtn) {
-    searchBtn.addEventListener("click", () => {
-      cityInput.focus();
-      onSearchInput();
-    });
-  }
+.forecast-time {
+  font-size: 0.8rem;
+  color: rgba(226,232,240,0.92);
+  letter-spacing: 0.02em;
 }
 
-async function onSearchInput() {
-  if (!cityInput || !cityResults) return;
-  const q = cityInput.value.trim().toLowerCase();
-  if (!q) {
-    cityResults.style.display = "none";
-    return;
-  }
+.forecast-temp {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
 
-  const matches = LOCAL_CITIES.filter((c) =>
-    c.name.toLowerCase().startsWith(q)
+body.theme-day .forecast-time,
+body.theme-clear .forecast-time {
+  color: #475569;
+}
+.city-card-delete {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  background: rgba(255,255,255,0.25);
+  backdrop-filter: blur(8px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.city-card-delete:hover {
+  background: rgba(255,255,255,0.35);
+}
+/* ===============================
+   WEATHER VIDEO BACKGROUND
+   =============================== */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: #030712;
+  z-index: 0;
+  opacity: 0;
+  display: none;
+  transition: opacity 0.6s ease;
+}
+
+.hero.hero--night .hero-video {
+  display: block;
+  opacity: 0.85;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.25),
+    rgba(0,0,0,0.45)
   );
-
-  cityResults.innerHTML = "";
-  cityResults.style.display = matches.length ? "block" : "none";
-
-  matches.forEach((c) => {
-    const el = document.createElement("div");
-    el.className = "city-result-item";
-    el.innerHTML = `<span>${FLAGS[c.country] ?? ""}</span> <span>${c.name}</span>`;
-
-    el.addEventListener("click", async () => {
-      cityInput.value = c.name;
-      cityResults.style.display = "none";
-
-      const geoRes = await fetch(
-        `https://api.openweathermap.org/geo/1.0/direct?q=${c.name},${c.country}&limit=1&appid=${API_KEY}`
-      );
-      const [geo] = await geoRes.json();
-
-      if (geo) loadWeatherByCoords(geo.lat, geo.lon);
-    });
-
-    cityResults.appendChild(el);
-  });
+  z-index: 1;
 }
 
-/* ==========================================
-   HELPERS
-   ========================================== */
-
-function formatTime(d) {
-  return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+.hero-main {
+  position: relative;
+  z-index: 2;
 }
 
-function formatHourLabel(d) {
-  const hour = d.getHours().toString().padStart(2, "0");
-  return `${hour} Uhr`;
+/* Cards mit Bild / Gradient */
+.city-card {
+  background-size: cover;
+  background-position: center;
+  position: relative;
 }
 
-function lerp(a, b, t) {
-  return a + (b - a) * t;
+.city-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.15),
+    rgba(0,0,0,0.45)
+  );
+  border-radius: inherit;
 }
 
-function buildHourlyForecast(currentData, list, hours = 12) {
-  if (!currentData) return [];
+.city-card > * {
+  position: relative;
+  z-index: 1;
+}
 
-  const segments = [
-    {
-      dt: currentData.dt,
-      main: { temp: currentData.main?.temp ?? currentData.main?.feels_like ?? 0 },
-      weather: currentData.weather
-    }
-  ];
+/* ===========================================
+   ANIMATIONS
+   =========================================== */
 
-  if (Array.isArray(list) && list.length) {
-    segments.push(...list);
+@keyframes cardPop {
+  0% {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
   }
-
-  segments.sort((a, b) => a.dt - b.dt);
-
-  const baseTime = currentData.dt;
-  const hourly = [];
-  let segmentIndex = 0;
-
-  for (let i = 0; i < hours; i++) {
-    const targetDt = baseTime + i * 3600;
-
-    while (
-      segmentIndex < segments.length - 1 &&
-      segments[segmentIndex + 1].dt < targetDt
-    ) {
-      segmentIndex++;
-    }
-
-    const prev = segments[segmentIndex];
-    const next = segments[segmentIndex + 1] || prev;
-    const prevTemp = prev.main?.temp ?? prev.main?.feels_like ?? 0;
-    const nextTemp = next.main?.temp ?? next.main?.feels_like ?? prevTemp;
-    const span = next.dt - prev.dt || 1;
-    const ratio = Math.min(1, Math.max(0, (targetDt - prev.dt) / span));
-
-    const temp = lerp(prevTemp, nextTemp, ratio);
-    const weatherSource = ratio < 0.5 ? prev : next;
-    const weather = weatherSource.weather?.[0] || prev.weather?.[0] || {};
-
-    hourly.push({
-      dt: targetDt,
-      temp,
-      weatherMain: weather.main || "",
-      weatherDesc: weather.description || ""
-    });
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
   }
-
-  return hourly;
 }
 
-function conditionToEmoji(c) {
-  c = c.toLowerCase();
-  if (c.includes("rain") || c.includes("regen")) return "🌧";
-  if (c.includes("cloud")) return "☁️";
-  if (c.includes("clear") || c.includes("klar") || c.includes("sonnig")) return "☀️";
-  if (c.includes("storm") || c.includes("gewitter")) return "⛈";
-  if (c.includes("snow") || c.includes("schnee")) return "❄️";
-  if (c.includes("fog") || c.includes("nebel")) return "🌫";
-  return "🌡";
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-function computeDewPoint(t, h) {
-  const a = 17.27, b = 237.7;
-  const alpha = (a * t) / (b + t) + Math.log(h / 100);
-  return (b * alpha) / (a - alpha);
+.animate-fade-in {
+  animation: fadeUp 0.6s cubic-bezier(.22,.61,.36,1) both;
 }
 
-function dewPointExplain(dp) {
-  if (dp < 10) return "trocken";
-  if (dp < 16) return "angenehm";
-  if (dp < 20) return "leicht schwül";
-  return "schwül";
+/* ===========================================
+   CITY CARD DETAILS
+   =========================================== */
+
+.city-card {
+  position: relative;
 }
 
-function thermalStress(f) {
-  if (f < 0) return "Kälte-Stress ❄️";
-  if (f < 10) return "Frisch 🧥";
-  if (f < 25) return "Komfortzone 🙂";
-  if (f < 32) return "Wärme-Stress ☀️";
-  return "Hitze-Stress 🔥";
+.city-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.city-card-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.2);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.city-card-temp {
+  font-size: 2.4rem;
+  font-weight: 600;
+}
+
+.city-card--warm {
+  background: linear-gradient(135deg, #ff7e5f, #ff9671);
+}
+
+.city-card--cold {
+  background: linear-gradient(135deg, #4776e6, #8e54e9);
+}
+
+.city-card--neutral {
+  background: linear-gradient(135deg, #2bc0e4, #eaecc6);
+  color: #111;
+}
+
+.city-card--neutral .city-card-chip,
+.city-card--neutral .city-card-delete {
+  background: rgba(255,255,255,0.5);
+  color: #111;
+}
+
+/* ===========================================
+   HERO STATE THEMES
+   =========================================== */
+
+.hero--clear {
+  background: linear-gradient(180deg, #4facfe, #00f2fe);
+}
+
+.hero--clouds {
+  background: linear-gradient(180deg, #8e9eab, #eef2f3);
+  color: #0f172a;
+}
+
+.hero--rain {
+  background: linear-gradient(180deg, #1f1c2c, #928dab);
+}
+
+.hero--snow {
+  background: linear-gradient(180deg, #dae2f8, #d6a4a4);
+  color: #0f172a;
+}
+
+.hero--night {
+  background: linear-gradient(180deg, #141e30, #243b55);
+}
+
+/* ===========================================
+   SPLASH SCREEN
+   =========================================== */
+
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top, #020617, #0f172a);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 999;
+  transition: opacity 0.6s ease;
+}
+
+.splash--hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-anim {
+  width: 160px;
+  height: 160px;
+  position: relative;
+  margin-bottom: 22px;
+}
+
+.sun-core,
+.sun-rays,
+.sun-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.sun-core {
+  background: radial-gradient(circle, #ffe259, #ffa751);
+  width: 60px;
+  height: 60px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 30px rgba(255, 166, 81, 0.7);
+}
+
+.sun-rays {
+  border: 2px solid rgba(255,255,255,0.4);
+  animation: spin 8s linear infinite;
+}
+
+.sun-ring {
+  border: 1px solid rgba(255,255,255,0.25);
+  transform: scale(1.3);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+.splash-title {
+  font-size: 1.4rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.3; transform: scale(1.2); }
+  50% { opacity: 0.7; transform: scale(1.35); }
+  100% { opacity: 0.3; transform: scale(1.2); }
+}
+
+/* ===========================================
+   RAIN CARD + HEAT SCALE
+   =========================================== */
+
+#rain-card {
+  margin-bottom: 20px;
+}
+
+#rain-canvas {
+  width: 100%;
+  height: 120px;
+  display: block;
+  margin-top: 16px;
+}
+
+.heat-scale {
+  margin: 18px 0;
+}
+
+.heat-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.heat-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.heat-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #00c6ff, #1de5fd, #ffe259, #ff6a00, #c21500);
+}
+
+.heat-marker {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #111827;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  transition: left 0.4s ease;
 }
