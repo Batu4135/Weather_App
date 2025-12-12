@@ -30,7 +30,7 @@ body {
   padding: 20px;
   transition: background 0.8s ease;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 body.theme-night {
@@ -812,3 +812,4 @@ body.theme-clear .sun-orb {
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
   transition: left 0.4s ease;
 }
+
