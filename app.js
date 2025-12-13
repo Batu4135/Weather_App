@@ -13,6 +13,7 @@ const backButton = document.getElementById("back-button");
 
 /* DOM: Detail – Hero */
 const heroSectionEl = document.getElementById("hero");
+const heroNightVideoEl = document.getElementById("hero-night-video");
 const heroTempEl = document.getElementById("hero-temp");
 const heroCityEl = document.getElementById("hero-city");
 const heroCondEl = document.getElementById("hero-condition");
@@ -22,9 +23,16 @@ const heroMetaEl = document.getElementById("hero-meta");
 const metricsGridEl = document.getElementById("metrics-grid");
 const forecastTrackEl = document.getElementById("forecast-track");
 const advancedGridEl = document.getElementById("advanced-grid");
+const dailyForecastSectionEl = document.getElementById("daily-forecast-section");
+const dailyForecastListEl = document.getElementById("daily-forecast-list");
 
-const rainCanvasEl = document.getElementById("rain-canvas");
 const rainCaptionEl = document.getElementById("rain-caption");
+const rainGaugeEl = document.getElementById("rain-gauge");
+const rainGaugePeakEl = document.getElementById("rain-gauge-peak");
+const rainMetaNowEl = document.getElementById("rain-meta-now");
+const rainMetaHourEl = document.getElementById("rain-meta-hour");
+const rainMetaThreeEl = document.getElementById("rain-meta-three");
+const rainDetailsEl = document.getElementById("rain-details");
 
 const heatMarkerEl = document.getElementById("heat-marker");
 const heatCaptionEl = document.getElementById("heat-caption");
@@ -44,6 +52,7 @@ const splashEl = document.getElementById("splash");
 /* STATE */
 let recentCities = [];
 let forecastDragInitialized = false;
+let latestRainList = [];
 
 /* ==========================================
    INIT
@@ -66,6 +75,7 @@ function initApp() {
   setupBackButton();
   setupGeolocationCard();
   initHeroParallax();
+  initHeroVideoPlayback();
 }
 
 /* ==========================================
@@ -151,6 +161,35 @@ function initHeroParallax() {
   heroSectionEl.addEventListener("pointerleave", () => {
     heroSectionEl.style.transform = "";
   });
+}
+
+/* ==========================================
+   HERO VIDEO – iOS AUTOPLAY UNLOCK
+   ========================================== */
+
+function initHeroVideoPlayback() {
+  if (!heroNightVideoEl) return;
+
+  heroNightVideoEl.muted = true;
+  heroNightVideoEl.playsInline = true;
+  heroNightVideoEl.setAttribute("webkit-playsinline", "true");
+
+  const attemptPlay = () => {
+    heroNightVideoEl.play().catch(() => {});
+  };
+
+  attemptPlay();
+
+  const handleFirstInteraction = () => {
+    attemptPlay();
+    ["touchstart", "pointerdown", "click"].forEach((evt) =>
+      document.removeEventListener(evt, handleFirstInteraction)
+    );
+  };
+
+  ["touchstart", "pointerdown", "click"].forEach((evt) =>
+    document.addEventListener(evt, handleFirstInteraction, { passive: true })
+  );
 }
 
 /* ==========================================
@@ -335,14 +374,17 @@ async function loadWeatherByCoords(lat, lon) {
   try {
     const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
     const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
+    const oneCallUrl = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=minutely,hourly,alerts&appid=${API_KEY}&units=${UNITS}&lang=${LANG}`;
 
-    const [currentRes, forecastRes] = await Promise.all([
+    const [currentRes, forecastRes, oneCallRes] = await Promise.all([
       fetch(currentUrl),
-      fetch(forecastUrl)
+      fetch(forecastUrl),
+      fetch(oneCallUrl)
     ]);
 
     const current = await currentRes.json();
     const forecast = await forecastRes.json();
+    const oneCall = await oneCallRes.json();
 
     const cityName = current.name;
     const country = current.sys?.country || "";
@@ -354,8 +396,13 @@ async function loadWeatherByCoords(lat, lon) {
     renderMetrics(current);
     renderForecast(current, forecast);
     renderAdvanced(current);
-    renderRainWaveform(forecast);
+    renderRainInsights(forecast);
     renderHeatStress(current);
+    const dailyForcastSource =
+      Array.isArray(oneCall?.daily) && oneCall.daily.length
+        ? oneCall.daily
+        : buildDailyFromForecastList(forecast?.list || []);
+    renderDailyForecast(dailyForcastSource);
 
     applyWeatherBackground(current);
     setAtmosphereTheme(current);
@@ -650,6 +697,79 @@ function initForecastDragWithMomentum() {
 }
 
 /* ==========================================
+   7-DAY DAILY FORECAST
+   ========================================== */
+
+function renderDailyForecast(dailyData) {
+  if (!dailyForecastListEl || !dailyForecastSectionEl) return;
+
+  dailyForecastListEl.innerHTML = "";
+  dailyForecastSectionEl.style.display = "none";
+
+  if (!Array.isArray(dailyData) || !dailyData.length) return;
+
+  const entries = dailyData.slice(0, 8);
+  const mins = entries.map(
+    (d) => Math.round(d.temp?.min ?? d.temp?.night ?? d.temp ?? 0)
+  );
+  const maxs = entries.map(
+    (d) => Math.round(d.temp?.max ?? d.temp?.day ?? d.temp ?? 0)
+  );
+  const globalMin = Math.min(...mins);
+  const globalMax = Math.max(...maxs);
+  const span = Math.max(1, globalMax - globalMin);
+
+  entries.forEach((day, index) => {
+    const dt = new Date(day.dt * 1000);
+    const label = index === 0 ? "Heute" : formatWeekdayShort(dt);
+    const desc = day.weather?.[0]?.description || day.weather?.[0]?.main || "";
+    const prettyDesc = desc
+      ? desc.charAt(0).toUpperCase() + desc.slice(1)
+      : "—";
+    const conditionKey = `${day.weather?.[0]?.main || ""} ${desc}`.trim();
+    const icon = conditionToEmoji(conditionKey);
+    const max = Math.round(
+      day.temp?.max ?? day.temp?.day ?? day.temp ?? 0
+    );
+    const min = Math.round(
+      day.temp?.min ?? day.temp?.night ?? day.temp ?? 0
+    );
+    const pop =
+      typeof day.pop === "number" && day.pop > 0
+        ? `${Math.round(day.pop * 100)}%`
+        : "";
+
+    const left = Math.min(100, Math.max(0, ((min - globalMin) / span) * 100));
+    const rawWidth = Math.max(6, ((max - min) / span) * 100);
+    const width = Math.max(4, Math.min(100 - left, rawWidth));
+
+    const row = document.createElement("div");
+    row.className = "daily-row animate-fade-in";
+    row.style.animationDelay = `${index * 60}ms`;
+    row.innerHTML = `
+      <div class="daily-day">${label}</div>
+      <div class="daily-icon-wrap">
+        <span class="daily-icon">${icon}</span>
+        ${pop ? `<span class="daily-pop">${pop}</span>` : ""}
+      </div>
+      <div class="daily-temps">
+        <span class="daily-temp-min">${min}°</span>
+        <div class="daily-range">
+          <div class="daily-range-track">
+            <div class="daily-range-fill" style="left:${left}%;width:${width}%"></div>
+          </div>
+        </div>
+        <span class="daily-temp-max">${max}°</span>
+      </div>
+      <div class="daily-desc">${prettyDesc}</div>
+    `;
+    dailyForecastListEl.appendChild(row);
+  });
+
+  dailyForecastSectionEl.style.display = "block";
+}
+
+/* ==========================================
    ADVANCED DATA
    ========================================== */
 
@@ -685,48 +805,74 @@ function renderAdvanced(data) {
 
 
 /* ==========================================
-   RAIN WAVEFORM
+   RAIN INSIGHTS
    ========================================== */
 
-function renderRainWaveform(forecast) {
-  if (!rainCanvasEl || !rainCaptionEl) return;
+function renderRainInsights(forecast) {
+  if (!rainCaptionEl || !rainGaugeEl || !rainGaugePeakEl) return;
+  const list = Array.isArray(forecast?.list) ? forecast.list.slice(0, 12) : [];
+  latestRainList = list;
 
-  const canvas = rainCanvasEl;
-  const caption = rainCaptionEl;
-  const ctx = canvas.getContext("2d");
+  if (!list.length) {
+    rainCaptionEl.textContent = "Keine Daten";
+    rainGaugePeakEl.textContent = "--%";
+    rainGaugeEl.style.setProperty("--gauge-fill", "0%");
+    [rainMetaNowEl, rainMetaHourEl, rainMetaThreeEl].forEach((el) => {
+      if (el) el.textContent = "--%";
+    });
+    renderRainDetails();
+    return;
+  }
 
-  canvas.width = canvas.offsetWidth * 2;
-  canvas.height = canvas.offsetHeight * 2;
-  ctx.scale(2, 2);
+  const pops = list.map((item) => Math.round((item.pop || 0) * 100));
+  const avg = Math.round(pops.reduce((a, b) => a + b, 0) / pops.length);
+  const peak = Math.max(...pops);
 
-  const w = canvas.offsetWidth;
-  const h = canvas.offsetHeight;
+  rainCaptionEl.textContent = `Ø ${avg}%`;
+  rainGaugePeakEl.textContent = `${peak}%`;
+  rainGaugeEl.style.setProperty("--gauge-fill", `${peak}%`);
 
-  const data = forecast.list.slice(0, 12).map((i) => i.pop || 0);
-  const max = Math.max(...data, 0.01);
+  const now = pops[0] ?? 0;
+  const hour = pops[1] ?? pops[0] ?? 0;
+  const three = pops[3] ?? pops[pops.length - 1] ?? 0;
 
-  ctx.clearRect(0, 0, w, h);
+  if (rainMetaNowEl) rainMetaNowEl.textContent = `${now}%`;
+  if (rainMetaHourEl) rainMetaHourEl.textContent = `${hour}%`;
+  if (rainMetaThreeEl) rainMetaThreeEl.textContent = `${three}%`;
 
-  ctx.strokeStyle = "#bbb";
-  ctx.beginPath();
-  ctx.moveTo(0, h - 18);
-  ctx.lineTo(w, h - 18);
-  ctx.stroke();
+  renderRainDetails();
+}
 
-  ctx.beginPath();
-  data.forEach((p, i) => {
-    const x = (i / (data.length - 1)) * (w - 20) + 10;
-    const y = h - 18 - (p / max) * (h - 35);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+function renderRainDetails() {
+  if (!rainDetailsEl) return;
+
+  const subset = latestRainList.slice(0, 6);
+  rainDetailsEl.innerHTML = "";
+
+  if (!subset.length) {
+    rainDetailsEl.innerHTML = `<div class="rain-detail-row">Keine Daten</div>`;
+    return;
+  }
+
+  subset.forEach((item) => {
+    const dt = new Date(item.dt * 1000);
+    const timeLabel = formatHourCompact(dt);
+    const pop = Math.round((item.pop || 0) * 100);
+    const width = Math.min(100, Math.max(4, pop));
+
+    const row = document.createElement("div");
+    row.className = "rain-detail-row";
+    row.innerHTML = `
+      <div class="rain-detail-top">
+        <span class="rain-detail-time">${timeLabel}</span>
+        <span class="rain-detail-value">${pop}%</span>
+      </div>
+      <div class="rain-detail-bar">
+        <div class="rain-detail-bar-fill" style="width:${width}%"></div>
+      </div>
+    `;
+    rainDetailsEl.appendChild(row);
   });
-
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#111";
-  ctx.stroke();
-
-  const avg = Math.round((data.reduce((a, b) => a + b, 0) / data.length) * 100);
-  caption.textContent = `Durchschnittliche Regenwahrscheinlichkeit: ${avg}%`;
 }
 
 /* ==========================================
@@ -748,22 +894,21 @@ function renderHeatStress(current) {
    SEARCH
    ========================================== */
 
-const LOCAL_CITIES = [
-  { name: "Berlin", country: "DE" },
-  { name: "Hamburg", country: "DE" },
-  { name: "München", country: "DE" },
-  { name: "Frankfurt", country: "DE" },
-  { name: "Düsseldorf", country: "DE" },
-  { name: "Istanbul", country: "TR" },
-  { name: "Ankara", country: "TR" },
-  { name: "Izmir", country: "TR" },
-  { name: "Antalya", country: "TR" }
-];
+const SUPPORTED_COUNTRIES = ["DE", "TR"];
 
 const FLAGS = {
   DE: "🇩🇪",
   TR: "🇹🇷"
 };
+
+function normalizeSearchText(value = "") {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+let searchAbortController = null;
 
 function setupSearch() {
   if (!cityInput) return;
@@ -780,38 +925,127 @@ function setupSearch() {
 
 async function onSearchInput() {
   if (!cityInput || !cityResults) return;
-  const q = cityInput.value.trim().toLowerCase();
-  if (!q) {
+  const rawValue = cityInput.value.trim();
+  const normalizedQuery = normalizeSearchText(rawValue);
+  if (!rawValue || normalizedQuery.length < 1) {
     cityResults.style.display = "none";
     return;
   }
 
-  const matches = LOCAL_CITIES.filter((c) =>
-    c.name.toLowerCase().startsWith(q)
-  );
+  if (searchAbortController) {
+    searchAbortController.abort();
+  }
+  searchAbortController = new AbortController();
 
-  cityResults.innerHTML = "";
-  cityResults.style.display = matches.length ? "block" : "none";
+  try {
+    const requests = [];
 
-  matches.forEach((c) => {
-    const el = document.createElement("div");
-    el.className = "city-result-item";
-    el.innerHTML = `<span>${FLAGS[c.country] ?? ""}</span> <span>${c.name}</span>`;
+    // Broad query so even one character returns something we can filter locally.
+    const broadLimit = normalizedQuery.length === 1 ? 50 : 25;
+    requests.push(
+      fetch(
+        `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(rawValue)}&limit=${broadLimit}&appid=${API_KEY}`,
+        { signal: searchAbortController.signal }
+      )
+        .then((res) => res.json())
+        .catch((err) => {
+          if (err.name === "AbortError") return [];
+          console.error("Geo fetch failed", err);
+          return [];
+        })
+    );
 
-    el.addEventListener("click", async () => {
-      cityInput.value = c.name;
-      cityResults.style.display = "none";
-
-      const geoRes = await fetch(
-        `https://api.openweathermap.org/geo/1.0/direct?q=${c.name},${c.country}&limit=1&appid=${API_KEY}`
+    // Targeted per-country queries to guarantee DE/TR matches even for single letters.
+    SUPPORTED_COUNTRIES.forEach((country) => {
+      requests.push(
+        fetch(
+          `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(`${rawValue},${country}`)}&limit=20&appid=${API_KEY}`,
+          { signal: searchAbortController.signal }
+        )
+          .then((res) => res.json())
+          .catch((err) => {
+            if (err.name === "AbortError") return [];
+            console.error("Geo fetch failed", err);
+            return [];
+          })
       );
-      const [geo] = await geoRes.json();
-
-      if (geo) loadWeatherByCoords(geo.lat, geo.lon);
     });
 
-    cityResults.appendChild(el);
-  });
+    const responses = await Promise.all(requests);
+
+    const data = responses.flat();
+    const filtered = data.filter(
+      (city) => city && city.name && city.country && SUPPORTED_COUNTRIES.includes(city.country)
+    );
+
+    const dedup = [];
+    const seen = new Set();
+    filtered.forEach((city) => {
+      if (!city.name) return;
+      const key = `${normalizeSearchText(city.name)}_${city.country}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      dedup.push(city);
+    });
+
+    const requireContains = normalizedQuery.length > 1;
+
+    const matches = dedup
+      .map((city) => {
+        const normalized = normalizeSearchText(city.name);
+        const prefixMatch = normalized.startsWith(normalizedQuery);
+        const containsMatch = normalized.includes(normalizedQuery);
+        const score = prefixMatch ? 0 : containsMatch ? 1 : 2;
+        const lengthDelta = Math.abs(normalized.length - normalizedQuery.length);
+        return { city, score, lengthDelta, normalized };
+      })
+      .filter((entry) => {
+        if (!requireContains) return true;
+        return entry.normalized.includes(normalizedQuery);
+      })
+      .sort((a, b) => {
+        if (a.score !== b.score) return a.score - b.score;
+        if (a.lengthDelta !== b.lengthDelta) return a.lengthDelta - b.lengthDelta;
+        return a.normalized.localeCompare(b.normalized);
+      })
+      .map((entry) => ({
+        name: entry.city.name,
+        state: entry.city.state,
+        country: entry.city.country,
+        lat: entry.city.lat,
+        lon: entry.city.lon
+      }));
+
+    cityResults.innerHTML = "";
+
+    if (!matches.length) {
+      cityResults.style.display = "none";
+      return;
+    }
+
+    matches.slice(0, 12).forEach((city) => {
+      const el = document.createElement("div");
+      el.className = "city-result-item";
+      const subtitle = city.state ? `, ${city.state}` : "";
+      el.innerHTML = `<span>${FLAGS[city.country] ?? ""}</span> <span>${city.name}${subtitle}</span>`;
+
+      el.addEventListener("click", () => {
+        cityInput.value = city.name;
+        cityResults.style.display = "none";
+        loadWeatherByCoords(city.lat, city.lon);
+      });
+
+      cityResults.appendChild(el);
+    });
+
+    cityResults.style.display = "block";
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    console.error("Geo search failed", err);
+    cityResults.style.display = "none";
+  } finally {
+    searchAbortController = null;
+  }
 }
 
 /* ==========================================
@@ -825,6 +1059,14 @@ function formatTime(d) {
 function formatHourLabel(d) {
   const hour = d.getHours().toString().padStart(2, "0");
   return `${hour} Uhr`;
+}
+
+function formatHourCompact(d) {
+  return d.toLocaleTimeString("de-DE", { hour: "2-digit" });
+}
+
+function formatWeekdayShort(d) {
+  return d.toLocaleDateString("de-DE", { weekday: "short" });
 }
 
 function lerp(a, b, t) {
@@ -882,6 +1124,55 @@ function buildHourlyForecast(currentData, list, hours = 12) {
   }
 
   return hourly;
+}
+
+function buildDailyFromForecastList(list) {
+  if (!Array.isArray(list) || !list.length) return [];
+
+  const groups = new Map();
+
+  list.forEach((item) => {
+    const date = new Date(item.dt * 1000);
+    const key = date.toISOString().split("T")[0];
+    if (!groups.has(key)) {
+      groups.set(key, {
+        dt: new Date(key).getTime() / 1000,
+        temps: [],
+        weatherSamples: [],
+        pops: []
+      });
+    }
+    const group = groups.get(key);
+    group.temps.push(item.main?.temp ?? item.main?.feels_like ?? 0);
+    group.weatherSamples.push(item.weather?.[0]);
+    if (typeof item.pop === "number") group.pops.push(item.pop);
+  });
+
+  const days = Array.from(groups.values())
+    .sort((a, b) => a.dt - b.dt)
+    .slice(0, 7)
+    .map((day) => {
+      const max = Math.round(Math.max(...day.temps));
+      const min = Math.round(Math.min(...day.temps));
+      const weather =
+        day.weatherSamples[Math.floor(day.weatherSamples.length / 2)] ||
+        day.weatherSamples[0] ||
+        { main: "", description: "" };
+
+      const popAvg =
+        day.pops.length > 0
+          ? day.pops.reduce((sum, p) => sum + p, 0) / day.pops.length
+          : undefined;
+
+      return {
+        dt: day.dt,
+        temp: { max, min },
+        weather: [weather],
+        pop: popAvg
+      };
+    });
+
+  return days;
 }
 
 function conditionToEmoji(c) {
