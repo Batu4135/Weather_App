@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
   />
   <title>Wetter App</title>
 
@@ -45,11 +45,9 @@
       <header class="home-header">
         <div class="home-header-top">
           <div>
-            <div class="home-hello">Hi, David 👋</div>
-            <div class="home-subtitle">Entdecke das Wetter der Welt</div>
+            <div class="home-hello">Wetter Überblick</div>
+            <div class="home-subtitle"></div>
           </div>
-
-          <div class="home-avatar">WU</div>
         </div>
 
         <!-- Suchfeld -->
@@ -100,6 +98,8 @@
           muted
           loop
           playsinline
+          webkit-playsinline
+          preload="auto"
           aria-hidden="true"
         ></video>
         <!-- Dynamic Island -->
@@ -117,18 +117,24 @@
         </div>
       </section>
 
-      <!-- AKTUELLE WERTE -->
-      <section class="section">
-        <h2 class="section-title">Aktuelle Werte</h2>
-        <div id="metrics-grid" class="metrics-grid"></div>
-      </section>
-
       <!-- VORHERSAGE -->
       <section class="section">
         <h2 class="section-title">Nächste Stunden</h2>
         <div class="forecast-strip">
           <div id="forecast-track" class="forecast-track"></div>
         </div>
+      </section>
+
+      <!-- AKTUELLE WERTE -->
+      <section class="section section--metrics">
+        <h2 class="section-title">Aktuelle Werte</h2>
+        <div id="metrics-grid" class="metrics-grid"></div>
+      </section>
+
+      <!-- DAILY FORECAST -->
+      <section id="daily-forecast-section" class="section" style="display:none;">
+        <h2 class="section-title">Nächste 7 Tage</h2>
+        <div id="daily-forecast-list" class="daily-forecast-list"></div>
       </section>
 
       <!-- ADVANCED INSIGHTS -->
@@ -142,9 +148,24 @@
         <h2 class="section-title">Rain & Comfort</h2>
 
         <div id="rain-card" class="card">
-          <div class="card-title">Regenwahrscheinlichkeit</div>
-          <canvas id="rain-canvas"></canvas>
-          <div class="card-extra" id="rain-caption"></div>
+          <div class="rain-header">
+            <div class="card-title">Regenwahrscheinlichkeit</div>
+            <span id="rain-caption" class="rain-caption">--%</span>
+          </div>
+          <div class="rain-main">
+            <div id="rain-gauge" class="rain-gauge" aria-hidden="true">
+              <div class="rain-gauge-center">
+                <span id="rain-gauge-peak">--%</span>
+                <small>Peak</small>
+              </div>
+            </div>
+            <div class="rain-meta">
+              <div class="rain-meta-line"><span>Jetzt</span><span id="rain-meta-now">--%</span></div>
+              <div class="rain-meta-line"><span>+1 Std</span><span id="rain-meta-hour">--%</span></div>
+              <div class="rain-meta-line"><span>+3 Std</span><span id="rain-meta-three">--%</span></div>
+            </div>
+          </div>
+          <div id="rain-details" class="rain-details"></div>
         </div>
 
         <div id="heat-card" class="card">
@@ -171,6 +192,37 @@
   </main>
 
   <script src="app.js"></script>
+  <script>
+    // Prevent zoom interactions so the PWA stays fixed-size
+    (function preventZoom() {
+      let lastTouchEnd = 0;
+
+      document.addEventListener(
+        "touchmove",
+        (event) => {
+          if (event.scale && event.scale !== 1) {
+            event.preventDefault();
+          }
+        },
+        { passive: false }
+      );
+
+      document.addEventListener(
+        "touchend",
+        (event) => {
+          const now = Date.now();
+          if (now - lastTouchEnd <= 350) {
+            event.preventDefault();
+          }
+          lastTouchEnd = now;
+        },
+        false
+      );
+
+      ["gesturestart", "gesturechange", "gestureend"].forEach((evt) =>
+        document.addEventListener(evt, (event) => event.preventDefault())
+      );
+    })();
+  </script>
 </body>
 </html>
-
